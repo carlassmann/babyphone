@@ -1,0 +1,40 @@
+{
+  "name": "babyphone",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/bun": "^1.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@types/web-push": "^3.6.4",
+    "@vitejs/plugin-react": "^6.1.1",
+    "prettier": "^3.9.6",
+    "sharp": "^0.35.4",
+    "vite": "^8.2.2"
+  },
+  "peerDependencies": {
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@fontsource/dm-sans": "^5.3.0",
+    "@fontsource/fredoka": "^5.3.0",
+    "jazz-tools": "2.0.0-alpha.53",
+    "lucide-react": "^1.38.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "web-push": "^3.6.7"
+  },
+  "scripts": {
+    "setup": "bun scripts/setup.ts",
+    "dev": "work up",
+    "build": "bun --bun vite build && bun scripts/build-sw.ts",
+    "check": "tsc --noEmit",
+    "test": "bun test tests",
+    "test:e2e": "bunx playwright test",
+    "preview": "bun --bun vite preview",
+    "setup:https": "bun scripts/https-setup.ts",
+    "format": "prettier --write src server api scripts tests e2e *.ts *.json work.config.js public/sw.js"
+  },
+  "packageManager": "bun@1.4.0"
+}

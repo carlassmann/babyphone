@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "Pip · Baby monitor",
+  "short_name": "Pip",
+  "description": "A little peace of mind. A private audio baby monitor.",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#edf3fb",
+  "theme_color": "#edf3fb",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

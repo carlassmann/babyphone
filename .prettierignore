@@ -1,0 +1,8 @@
+node_modules
+.data
+.certs
+dist
+artifacts
+test-results
+bun.lock
+public/pip-local-ca.crt

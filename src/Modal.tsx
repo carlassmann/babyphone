@@ -1,0 +1,35 @@
+import { useEffect, useRef, type ReactNode } from 'react';
+import { X } from 'lucide-react';
+export function Modal({
+  title,
+  close,
+  children,
+}: {
+  title: string;
+  close: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current!;
+    dialog.showModal();
+    return () => dialog.close();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      onCancel={close}
+      onClick={(e) => {
+        if (e.target === ref.current) close();
+      }}
+    >
+      <div className="modal-content">
+        <button className="icon-button modal-close" onClick={close} aria-label="Close dialog">
+          <X size={19} />
+        </button>
+        <h2>{title}</h2>
+        {children}
+      </div>
+    </dialog>
+  );
+}
