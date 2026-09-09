@@ -23,6 +23,7 @@ import { RoomConnection, request } from './connection';
 import { AudioCalls, BabyAudio } from './media';
 import { enableNotifications, usePwa } from './pwa';
 import { Modal } from './Modal';
+import { InvitationQr } from './InvitationQr';
 import { useScreenWake } from './useScreenWake';
 import { message, relative } from './format';
 import type { Alert, PublicDevice, Session } from './protocol';
@@ -757,12 +758,18 @@ export function Room({
           {modal === 'invite' ? (
             <>
               <p>
-                Share this link with another caregiver or device. Choose Me to listen, or Baby for
-                the device that stays in the nursery.
+                Choose Me on the joining device to listen, or Baby for the device that stays in the
+                nursery.
               </p>
+              <InvitationQr key={invitation} code={invitation} />
               <label>
                 Private invitation code
-                <input className="invitation-code" readOnly value={invitation} onFocus={(e) => e.target.select()} />
+                <input
+                  className="invitation-code"
+                  readOnly
+                  value={invitation}
+                  onFocus={(e) => e.target.select()}
+                />
               </label>
               <div className="invite-actions">
                 <button
