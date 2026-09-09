@@ -28,7 +28,7 @@ export function usePwa() {
       duration: Infinity,
       description: updateBlocked
         ? 'Pause monitoring and listening before updating.'
-        : 'Reload to use the latest version.',
+        : undefined,
       action: updateBlocked ? undefined : { label: 'Update', onClick: update },
     });
     return () => {
