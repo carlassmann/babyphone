@@ -1,4 +1,5 @@
 :root {
+  touch-action: pan-x pan-y;
   font-family: 'DM Sans', sans-serif;
   color: #293e60;
   background: #f8fafd;
@@ -22,6 +23,11 @@ body {
 button,
 input {
   font: inherit;
+}
+input,
+select,
+textarea {
+  font-size: 16px;
 }
 button,
 a,
@@ -352,7 +358,7 @@ input:not([type='range']) {
   margin-top: 8px;
   background: white;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 16px;
   min-height: 48px;
 }
 input::placeholder {
@@ -1405,6 +1411,9 @@ hr {
 [data-theme='dark'] .section-icon {
   background: #453d2d;
   color: #ecd39b;
+}
+[data-theme='dark'] .welcome-art em {
+  color: #b7cef2;
 }
 [data-theme='dark'] .mascot,
 [data-theme='dark'] .monitor-hero img,

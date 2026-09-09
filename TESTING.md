@@ -75,3 +75,15 @@ Cloudflare accepted the configured TURN key and token and returned HTTP 201 with
 - Add TURN credential renewal for continuous listening beyond 24 hours.
 
 No hosted deployment or physical-phone reliability claim has been made.
+
+## Deployed QA, September 9, 2026
+
+Three independent GPT-5.6 Sol agents checked `https://babyphone.carlassmann.com`.
+
+Production API checks passed for room creation, two invitation joins, cross-room isolation, invalid tokens, three authenticated WebSockets, shared sensitivity broadcasts, and a disconnected baby's offline event and stopped-monitoring state. Device removal closed its socket with code 4001, revoked HTTP access, and rotated the invitation. Reset rejected the previous invitation and allowed a fresh join. The backend probe removed its devices and temporary script. An initial offline-event timeout came from the probe also letting parent heartbeats expire; the corrected probe passed.
+
+Browser checks passed for parent room creation, invite copy confirmation, Monitor/Activity/Settings navigation, light/dark switching, dim/brighten controls, privacy and device settings dialogs, and recovery after closing a duplicate device tab. Browser agents interfered through shared same-origin storage, so this run does not verify independent browser pairing. Their tabs were closed; disposable browser QA rooms may remain.
+
+The primary agent verified HTTPS endpoints, manifest and service-worker responses, no-cache on the service worker, and matching production/local push configuration. Requests for local env filenames returned the HTML app shell, not env contents. All five runtime values matched local configuration, but private TURN and VAPID credentials were still plain-text Worker bindings and should be stored as Secrets.
+
+No real relayed audio, production push delivery, native install, physical-phone background behavior, or overnight reliability was verified in this run. The available browser did not expose the microphone/notification permission flow needed for media checks. TURN credential issuance succeeds, but that does not prove a relayed audio connection. The dark-mode illustration remains an unresolved visual issue; generated transparency attempts produced RGB checkerboards and were not integrated.
