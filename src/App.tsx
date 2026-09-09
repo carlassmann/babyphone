@@ -180,10 +180,10 @@ export function App() {
                   Privacy
                 </button>
               )}
-              {(rooms.length === 0 || !appMode) && (
+              {!pwa.installed && (rooms.length === 0 || !appMode) && (
                 <button className="quiet small" onClick={() => setModal('install')}>
                   <Download size={17} />
-                  <span>{pwa.installed ? 'App installed' : 'Get the app'}</span>
+                  <span>Get the app</span>
                 </button>
               )}
             </div>
