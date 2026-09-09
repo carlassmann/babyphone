@@ -18,7 +18,11 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      onCancel={close}
+      aria-label={title}
+      onCancel={(event) => {
+        event.preventDefault();
+        close();
+      }}
       onClick={(e) => {
         if (e.target === ref.current) close();
       }}

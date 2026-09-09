@@ -87,6 +87,14 @@ export class Room extends DurableObject<Env> {
         let roomName = this.get<string>('room', 'name');
         if (!roomName && !body.create)
           throw new RequestError('Room not found. Check your invitation code.', 404);
+        const invitation = this.get<string>('room', 'invitation');
+        const validLegacyInvitation =
+          typeof body.roomKey === 'string' &&
+          !body.roomKey.includes('.') &&
+          this.env.ROOMS.idFromName('room:' + hash(body.roomKey)).toString() ===
+            this.ctx.id.toString();
+        if (invitation ? invitation !== body.roomKey : !validLegacyInvitation)
+          throw new RequestError('Invitation expired. Ask for a new link.', 403);
         const token = key();
         const device: Device = {
           id: key(),
@@ -103,6 +111,7 @@ export class Room extends DurableObject<Env> {
             roomName = cleanName(body.roomName || 'Our little nest');
             this.put('room', 'name', roomName);
           }
+          if (!invitation) this.put('room', 'invitation', body.roomKey);
           this.put('device', device.id, device);
         });
         this.broadcast();
@@ -118,6 +127,29 @@ export class Room extends DurableObject<Env> {
       }
       const device = this.authenticate(body.deviceId, body.token);
       if (path === '/api/state') return json(this.state());
+      if (path === '/api/reset-invitation' || path === '/api/remove-device') {
+        if (device.role !== 'parent')
+          throw new RequestError('Use a parent device to manage access.', 403);
+        const target =
+          path === '/api/remove-device' ? this.get<Device>('device', body.target) : undefined;
+        if (path === '/api/remove-device' && (!target || target.id === device.id))
+          throw new RequestError('Choose another device to remove.');
+        const roomKey = this.ctx.id.toString() + '.' + key();
+        this.ctx.storage.transactionSync(() => {
+          this.put('room', 'invitation', roomKey);
+          if (target) {
+            this.remove('device', target.id);
+            this.remove('ice', target.id);
+            for (const job of this.all<Delivery>('delivery'))
+              if (job.deviceId === target.id) this.remove('delivery', job.id);
+          }
+        });
+        if (target) this.closeDevice(target.id, 4001, 'Access removed');
+        this.broadcast();
+        await this.schedule();
+        return json({ roomKey });
+      }
+
       if (path === '/api/sensitivity') {
         const target = this.get<Device>('device', body.target);
         if (
@@ -249,6 +281,7 @@ export class Room extends DurableObject<Env> {
     const now = Date.now();
     return {
       type: 'state',
+      roomKey: this.get<string>('room', 'invitation'),
       at: now,
       devices: this.all<Device>('device').map(
         ({ id, name, role, lastSeen, monitoring, level, lastNoise, sensitivity }) => ({
@@ -363,6 +396,7 @@ export class Room extends DurableObject<Env> {
   }
   private signal(source: Device, targetId: string, payload: Signal) {
     const target = this.get<Device>('device', targetId);
+    if (!target && (payload?.kind === 'stop' || payload?.kind === 'ice')) return;
     if (!target || target.role === source.role)
       throw new RequestError('That device is unavailable.');
     if (

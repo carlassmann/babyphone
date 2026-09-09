@@ -62,6 +62,28 @@ export function Room({
   const audioRef = useRef<HTMLDivElement>(null);
   const isBaby = session.role === 'baby';
   const connected = connection === 'Connected';
+  const [invitation, setInvitation] = useState(session.roomKey);
+  const [accessNotice, setAccessNotice] = useState('');
+  async function manageAccess(target?: string) {
+    setBusy(true);
+    setError('');
+    try {
+      await request(target ? 'remove-device' : 'reset-invitation', {
+        ...session,
+        target,
+      });
+      setCopied('');
+      setAccessNotice(
+        target
+          ? 'Device removed. Previous invitation links no longer work.'
+          : 'Invitation reset. Previous links no longer work.',
+      );
+    } catch (error) {
+      setError(message(error));
+    } finally {
+      setBusy(false);
+    }
+  }
   const parentAwake = useScreenWake(!isBaby);
   useEffect(() => {
     document.documentElement.dataset.dim = String(dim);
@@ -111,10 +133,16 @@ export function Room({
       session,
     ));
     let signals = Promise.resolve();
+    let knownDevices: string[] = [];
     const room = (connectionRef.current = new RoomConnection(
       session,
       (data) => {
         if (data.type === 'state') {
+          const ids = data.devices.map((device) => device.id);
+          for (const id of knownDevices) if (!ids.includes(id)) calls.stop(id);
+          knownDevices = ids;
+          if (data.roomKey) setInvitation(data.roomKey);
+
           setDevices(data.devices);
           setEvents(data.events);
           const own = data.devices.find((device) => device.id === session.deviceId);
@@ -135,7 +163,7 @@ export function Room({
       (status) => {
         setConnection(status);
         if (status !== 'Connected') calls.stop();
-        if (status === 'Open in another tab') {
+        if (status === 'Open in another tab' || status === 'Access removed') {
           baby.stop();
           stateRef.current.monitoring = false;
           setActive(false);
@@ -154,6 +182,8 @@ export function Room({
       .catch(() => setPush(false));
     const pageHide = () => {
       baby.stop();
+      calls.stop();
+      setActive(false);
       stateRef.current.monitoring = false;
       room.send({ type: 'heartbeat', monitoring: false, level: 0 });
     };
@@ -234,7 +264,7 @@ export function Room({
   async function leave() {
     setBusy(true);
     try {
-      await request('leave', session);
+      if (connection !== 'Access removed') await request('leave', session);
       save(null);
     } catch (error) {
       setError(message(error));
@@ -305,9 +335,11 @@ export function Room({
       {!connected && (
         <p role="alert" className="notice">
           <Wifi size={19} />
-          {connection === 'Open in another tab'
-            ? 'This device is open in another tab. Close this tab or reload to use Pip here.'
-            : 'Connection unavailable. Monitoring alerts cannot reach you. Check your baby and your connection; Pip is reconnecting.'}
+          {connection === 'Access removed'
+            ? 'Your access to this room was removed. Leave this room and ask for a new invitation.'
+            : connection === 'Open in another tab'
+              ? 'This device is open in another tab. Close this tab or reload to use Pip here.'
+              : 'Connection unavailable. Monitoring alerts cannot reach you. Check your baby and your connection; Pip is reconnecting.'}
         </p>
       )}
       {error && (
@@ -717,30 +749,41 @@ export function Room({
           {modal === 'invite' ? (
             <>
               <p>
-                Open Pip on your other device and join with this code. Choose Baby for the device
-                that stays in the nursery.
+                Share this link with another caregiver or device. Choose Me to listen, or Baby for
+                the device that stays in the nursery.
               </p>
               <label>
                 Private invitation code
-                <input readOnly value={session.roomKey} onFocus={(e) => e.target.select()} />
+                <input readOnly value={invitation} onFocus={(e) => e.target.select()} />
               </label>
               <div className="invite-actions">
                 <button
                   className="primary full"
-                  onClick={() => void copy(`${location.origin}/#join=${session.roomKey}`, 'link')}
+                  onClick={() => void copy(`${location.origin}/#join=${invitation}`, 'link')}
                 >
                   {copied === 'link' ? <Check size={17} /> : <Link size={17} />}{' '}
                   {copied === 'link' ? 'Link copied' : 'Copy invite link'}
                 </button>
-                <button
-                  className="secondary full"
-                  onClick={() => void copy(session.roomKey, 'code')}
-                >
+                <button className="secondary full" onClick={() => void copy(invitation, 'code')}>
                   <Copy size={16} />
                   {copied === 'code' ? 'Code copied' : 'Copy code'}
                 </button>
               </div>
               <p className="caption">Anyone with this invitation can join. Share it privately.</p>
+              {!isBaby && (
+                <button
+                  className="secondary full"
+                  disabled={busy || !connected}
+                  onClick={() => void manageAccess()}
+                >
+                  Reset invitation link
+                </button>
+              )}
+              {accessNotice && (
+                <p role="status" className="caption">
+                  {accessNotice}
+                </p>
+              )}
             </>
           ) : (
             <>
@@ -756,6 +799,42 @@ export function Room({
                 <ChevronRight size={17} />
               </button>
               <p className="caption">Switching roles pauses monitoring and stops live audio.</p>
+              {!isBaby && (
+                <>
+                  <hr />
+                  <h3>Room access</h3>
+                  <p className="caption">
+                    Any parent can remove devices. Removal also resets the invitation link. Existing
+                    devices stay connected.
+                  </p>
+                  {devices
+                    .filter((device) => device.id !== session.deviceId)
+                    .map((device) => (
+                      <div className="setting-detail" key={device.id}>
+                        <div>
+                          <strong>{device.name}</strong>
+                          <p>
+                            {device.role === 'baby' ? 'Baby' : 'Parent'} ·{' '}
+                            {device.online ? 'Online' : 'Offline'}
+                          </p>
+                        </div>
+                        <button
+                          className="quiet danger"
+                          disabled={busy || !connected}
+                          onClick={() => void manageAccess(device.id)}
+                          aria-label={`Remove ${device.name}`}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  {accessNotice && (
+                    <p role="status" className="caption">
+                      {accessNotice}
+                    </p>
+                  )}
+                </>
+              )}
               <hr />
               <button className="quiet danger" disabled={busy} onClick={() => void leave()}>
                 Leave this room <ArrowRight size={16} />

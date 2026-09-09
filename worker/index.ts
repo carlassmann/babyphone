@@ -38,11 +38,14 @@ export default {
           throw new RequestError('Too many attempts. Try again in a minute.', 429);
         if (
           body.roomKey !== undefined &&
-          (typeof body.roomKey !== 'string' || !/^[A-Za-z0-9_-]{24}$/.test(body.roomKey.trim()))
+          (typeof body.roomKey !== 'string' ||
+            !/^(?:[a-f0-9]{64}\.)?[A-Za-z0-9_-]{24}$/.test(body.roomKey.trim()))
         )
           throw new RequestError('Room not found. Check your invitation code.', 404);
         const roomKey = body.roomKey?.trim() || key();
-        const id = env.ROOMS.idFromName('room:' + hash(roomKey));
+        const id = roomKey.includes('.')
+          ? env.ROOMS.idFromString(roomKey.split('.')[0])
+          : env.ROOMS.idFromName('room:' + hash(roomKey));
         return env.ROOMS.get(id).fetch(
           new Request(request.url, {
             method: 'POST',

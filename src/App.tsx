@@ -4,6 +4,7 @@ import { usePwa } from './pwa';
 import { Welcome } from './Welcome';
 import { Room } from './Room';
 import { Modal } from './Modal';
+import { ApiError, request } from './connection';
 import type { Session } from './protocol';
 
 function readSession(): Session | null {
@@ -22,6 +23,46 @@ function readSession(): Session | null {
 export function App() {
   const [session, setSession] = useState<Session | null>(readSession);
   const [modal, setModal] = useState('');
+  const [incoming, setIncoming] = useState(
+    () => new URLSearchParams(location.hash.slice(1)).get('join') || '',
+  );
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState('');
+  useEffect(() => {
+    const changed = () => {
+      setIncoming(new URLSearchParams(location.hash.slice(1)).get('join') || '');
+      setJoinError('');
+    };
+    window.addEventListener('hashchange', changed);
+    return () => window.removeEventListener('hashchange', changed);
+  }, []);
+  function dismissInvitation() {
+    history.replaceState(null, '', '/app');
+    setIncoming('');
+    setJoinError('');
+  }
+  async function openInvitation() {
+    if (!session || joining) return;
+    setJoining(true);
+    setJoinError('');
+    try {
+      try {
+        await request('leave', session);
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 401)) throw error;
+      }
+      localStorage.removeItem('pip-session');
+      history.replaceState(null, '', '/app#join=' + encodeURIComponent(incoming));
+      setSession(null);
+    } catch (error) {
+      setJoinError(
+        error instanceof Error ? error.message : 'Could not leave this room. Try again.',
+      );
+    } finally {
+      setJoining(false);
+    }
+  }
+
   const pwa = usePwa();
   const [theme, setTheme] = useState(
     () =>
@@ -37,6 +78,7 @@ export function App() {
     if (value) localStorage.setItem('pip-session', JSON.stringify(value));
     else localStorage.removeItem('pip-session');
     history.replaceState(null, '', '/app');
+    setIncoming('');
     setSession(value);
   }
   return (
@@ -78,7 +120,7 @@ export function App() {
       {session ? (
         <Room key={`${session.deviceId}-${session.role}`} session={session} save={save} pwa={pwa} />
       ) : (
-        <Welcome onJoin={save} appMode={appMode} />
+        <Welcome key={incoming} onJoin={save} appMode={appMode} />
       )}
       {!appMode && (
         <footer>
@@ -88,6 +130,37 @@ export function App() {
           <button onClick={() => setModal('about')}>Privacy & how it works</button>
         </footer>
       )}
+      {session &&
+        incoming &&
+        incoming !== session.roomKey &&
+        !incoming.startsWith(session.roomId + '.') && (
+          <Modal
+            title="Open this invitation?"
+            close={() => {
+              if (!joining) dismissInvitation();
+            }}
+          >
+            <p>
+              This device is already in {session.roomName}. Leaving stops monitoring and
+              notifications for that room on this device.
+            </p>
+            <button
+              className="primary full"
+              disabled={joining}
+              onClick={() => void openInvitation()}
+            >
+              {joining ? 'Leaving room…' : 'Leave room and join'}
+            </button>
+            <button className="secondary full" disabled={joining} onClick={dismissInvitation}>
+              Keep current room
+            </button>
+            {joinError && (
+              <p role="alert" className="notice">
+                {joinError}
+              </p>
+            )}
+          </Modal>
+        )}
       {modal && (
         <Modal
           title={modal === 'install' ? 'A little home for Pip' : 'Just your ears. Just your room.'}

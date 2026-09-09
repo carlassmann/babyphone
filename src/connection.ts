@@ -50,6 +50,11 @@ export class RoomConnection {
       this.ready = false;
       clearInterval(this.ticker);
       if (this.stopped) return;
+      if (event.code === 4001) {
+        this.onStatus('Access removed');
+        this.stopped = true;
+        return;
+      }
       if (event.code === 4009) {
         this.onStatus('Open in another tab');
         this.stopped = true;
@@ -87,6 +92,15 @@ export class RoomConnection {
     this.socket?.close();
   }
 }
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
 export async function request(path: string, body: object) {
   const response = await fetch(`/api/${path}`, {
     method: 'POST',
@@ -95,6 +109,7 @@ export async function request(path: string, body: object) {
     signal: AbortSignal.timeout(10000),
   });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || 'Connection problem. Try again.');
+  if (!response.ok)
+    throw new ApiError(result.error || 'Connection problem. Try again.', response.status);
   return result;
 }

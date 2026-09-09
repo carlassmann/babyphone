@@ -34,9 +34,41 @@ Both microphones and all live playback were stopped afterward. Temporary inspect
 
 The final automated run passed TypeScript, the production build, the Bun noise test, the workerd integration test, and all six browser tests. The browser suite completed in 35.2 seconds.
 
+## Access management, September 9, 2026
+
+The workerd integration test verifies parent-only removal and invitation reset, self-removal and cross-room rejection, WebSocket closure, revoked HTTP and TURN access, old-link rejection, fresh-link joining, and persistence after runtime restart. A legacy-room check rejects forged invitations containing only a known room ID and an arbitrary secret.
+
+The browser lifecycle removes a parent during live listening, verifies playback stops and access stays revoked after reload, leaves the revoked session, rejects the old link, resets the invitation through the UI, and joins again using the new invitation. All six browser tests passed in 34.6 seconds.
+
+## Independent QA, September 9, 2026
+
+An independent QA agent reviewed and extended the runtime tests. Its Sol sub-agent audited backend authorization, invitation routing, removal, alarms, and retries. A separate agent reviewed media and PWA lifecycle code. The primary agent exercised the existing-room invitation flow through the browser UI.
+
+This review found and fixed:
+
+- Invitation links silently ignored when the device already belonged to another room. Pip now offers a room switch and preserves the invitation through leaving.
+- Paused audio still labeled as live. Playback interruption now exposes Resume audio, and ended playback clears the live status.
+- Late audio setup or resume completing after cancellation. Removed calls cannot restore a live status or restart their stream.
+- Baby monitoring UI remaining active after pagehide stopped its microphone. UI and audio now stop together.
+- Notification retries discarding an existing valid subscription. Matching VAPID subscriptions are reused.
+- A late reset HTTP response overwriting a newer invitation received through the room socket. Room state is now the authoritative source of the displayed invitation.
+- Dialogs missing accessible names.
+
+Regression tests exercise paused playback, pagehide cleanup, microphone shutdown on baby removal, invitation switching and cancellation, old-session revocation, and deliberately reordered invitation-reset responses. A temporary focused diagnostic checked push subscription reuse and replacement when the VAPID key changes.
+
+The final six-test browser suite passed in 34.7 seconds. After the final dialog Escape fix, its targeted handoff regression passed against a rebuilt app. TypeScript and the workerd integration test also passed.
+
+A clean 180-second Chromium run used two synthetic-microphone baby devices and two parent devices. All four audio streams advanced at 18 checkpoints, both parents stayed connected, and no page errors occurred. The temporary probe was removed; results remain in ignored `artifacts/qa-soak.json`. This verifies three minutes on one Mac, not overnight or physical-phone reliability. All test microphones stopped when the browser contexts closed.
+
+A production rebuild interrupted the first longer listening check because Wrangler watches the built assets and restarts. Room connections recovered, but playback required Listen again. Automatic resumption of live audio after connection loss is not implemented.
+
+## TURN configuration, September 9, 2026
+
+Cloudflare accepted the configured TURN key and token and returned HTTP 201 with temporary relay credentials. The restarted local Worker reports relay configuration active. Actual relayed audio has not been tested. Secrets remain in ignored local files.
+
 ## Before relying on the hosted app
 
-- Test actual Cloudflare TURN issuance and force a relayed call between cellular and Wi-Fi.
+- Force a real TURN-relayed call between cellular and Wi-Fi.
 - Verify push enrollment and delivery on locked physical iOS and Android devices.
 - Test long listening sessions, phone background suspension, low battery, and wake-lock loss.
 - Verify deployed Durable Object alarms and push retries during network interruption and deployment.

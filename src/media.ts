@@ -33,10 +33,12 @@ export class BabyAudio {
     }
     this.stream = stream;
     this.active = true;
-    this.context = new AudioContext();
-    await this.context.resume();
-    const source = this.context.createMediaStreamSource(stream);
-    const analyser = this.context.createAnalyser();
+    const context = (this.context = new AudioContext());
+    await context.resume();
+    if (generation !== this.generation) return;
+    this.detector = new NoiseDetector(this.detector.threshold);
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
     analyser.fftSize = 2048;
     source.connect(analyser);
     const data = new Float32Array(analyser.fftSize);
@@ -163,6 +165,16 @@ export class AudioCalls {
       }, 15000),
     };
     this.calls.set(callId, call);
+    if (audio) {
+      audio.onpause = () => {
+        if (this.calls.has(callId)) this.onStatus('Tap Resume audio to hear your baby.', target);
+      };
+      audio.onended = () => {
+        if (!this.calls.has(callId)) return;
+        this.end(callId);
+        this.onStatus('Audio disconnected. Tap Listen to reconnect.', target);
+      };
+    }
     peer.onicecandidate = (event) => {
       if (event.candidate)
         this.send(target, { kind: 'ice', callId, candidate: event.candidate.toJSON() });
@@ -206,6 +218,7 @@ export class AudioCalls {
     const { peer } = this.create(target, callId, true);
     peer.addTransceiver('audio', { direction: 'recvonly' });
     await peer.setLocalDescription(await peer.createOffer());
+    if (!this.calls.has(callId)) return;
     this.send(target, { kind: 'offer', callId, description: peer.localDescription!.toJSON() });
   }
   async receive(source: string, signal: Signal) {
@@ -244,8 +257,14 @@ export class AudioCalls {
       for (const existing of this.calls.values())
         if (existing.target === source) this.end(existing.callId);
       const generation = this.generation;
+      const attempt = this.attempts.get(source);
       await this.configure();
-      if (generation !== this.generation || this.stream() !== stream) return;
+      if (
+        generation !== this.generation ||
+        attempt !== this.attempts.get(source) ||
+        this.stream() !== stream
+      )
+        return;
       call = this.create(source, signal.callId, false);
       stream.getTracks().forEach((track) => call!.peer.addTrack(track, stream));
       await call.peer.setRemoteDescription(signal.description!);
@@ -288,7 +307,7 @@ export class AudioCalls {
     const call = [...this.calls.values()].find((item) => item.target === target && item.audio);
     if (!call?.audio) return;
     await call.audio.play();
-    this.onStatus('Listening live', target);
+    if (this.calls.get(call.callId) === call) this.onStatus('Listening live', target);
   }
   stop(target?: string) {
     if (target) this.attempts.set(target, (this.attempts.get(target) || 0) + 1);

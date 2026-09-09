@@ -82,11 +82,22 @@ export async function enableNotifications(session: Session) {
   const { pushKey } = await response.json();
   if (!pushKey) throw new Error('Push notifications are not configured on this server.');
   const existing = await registration.pushManager.getSubscription();
-  if (existing) await existing.unsubscribe();
-  const subscription = await withTimeout(
-    registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: pushKey }),
-    12000,
+  const existingKey = existing?.options.applicationServerKey;
+  const key = Uint8Array.from(atob(pushKey.replace(/-/g, '+').replace(/_/g, '/')), (char) =>
+    char.charCodeAt(0),
   );
+  const reusable =
+    existingKey &&
+    existingKey.byteLength === key.length &&
+    new Uint8Array(existingKey).every((byte, index) => byte === key[index]);
+  if (existing && !reusable) await existing.unsubscribe();
+  const subscription =
+    existing && reusable
+      ? existing
+      : await withTimeout(
+          registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }),
+          12000,
+        );
   await request('subscription', { ...session, subscription: subscription.toJSON() });
 }
 

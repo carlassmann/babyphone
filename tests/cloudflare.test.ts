@@ -112,6 +112,20 @@ test(
     }
     try {
       const baby = await register({ name: 'Nursery', role: 'baby' });
+      const legacyStorage = await runtime.unsafeGetDurableObjectStorage('pip-test', 'Room', {
+        id: baby.roomId,
+      });
+      await legacyStorage.exec("DELETE FROM records WHERE kind = 'room' AND id = 'invitation'");
+      assert.equal(
+        (
+          await post('register', {
+            name: 'Forged invite',
+            role: 'parent',
+            roomKey: baby.roomId + '.' + 'a'.repeat(24),
+          })
+        ).status,
+        403,
+      );
       const parent = await register({ name: 'Mom', role: 'parent', roomKey: baby.roomKey });
       const second = await register({ name: 'Dad', role: 'parent', roomKey: baby.roomKey });
       const outsider = await register({ name: 'Other room', role: 'parent' });
@@ -218,7 +232,11 @@ test(
       assert.equal(initial.events.filter((event: any) => event.kind === 'noise').length, 1);
       assert.equal(JSON.stringify(initial).includes('tokenHash'), false);
       assert.equal(JSON.stringify(initial).includes('subscription'), false);
-      for (const socket of sockets) socket.close();
+      for (const socket of sockets.splice(0)) {
+        try {
+          socket.close();
+        } catch {}
+      }
       await runtime.dispose();
       runtime = new Miniflare(options);
       await runtime.ready;
@@ -265,6 +283,71 @@ test(
       assert.equal((await post('clear-events', baby)).status, 403);
       assert.equal((await post('clear-events', parent)).status, 200);
       assert.equal(((await (await post('state', second)).json()) as any).events.length, 0);
+      const guestConnection = await connect(second);
+      let guestClosed = false;
+      guestConnection.socket.addEventListener('close', () => {
+        guestClosed = true;
+      });
+      assert.equal((await post('remove-device', { ...baby, target: second.deviceId })).status, 403);
+      assert.equal(
+        (await post('remove-device', { ...outsider, target: second.deviceId })).status,
+        400,
+      );
+      assert.equal(
+        (await post('remove-device', { ...parent, target: parent.deviceId })).status,
+        400,
+      );
+      assert.equal((await post('reset-invitation', baby)).status, 403);
+      const removal = await post('remove-device', { ...parent, target: second.deviceId });
+      assert.equal(removal.status, 200);
+      const replacement = (await removal.json()) as { roomKey: string };
+      await eventually(async () => guestClosed);
+      assert.equal((await post('state', second)).status, 401);
+      assert.equal((await post('ice', second)).status, 401);
+      assert.equal((await post('reset-invitation', second)).status, 401);
+      assert.equal(
+        (await post('register', { name: 'Removed guest', role: 'parent', roomKey: baby.roomKey }))
+          .status,
+        403,
+      );
+      const invited = await register({
+        name: 'New caregiver',
+        role: 'parent',
+        roomKey: replacement.roomKey,
+      });
+      assert.equal(invited.roomId, baby.roomId);
+      const reset = await post('reset-invitation', parent);
+      assert.equal(reset.status, 200);
+      const latest = (await reset.json()) as { roomKey: string };
+      assert.equal(
+        (
+          await post('register', {
+            name: 'Old invitation',
+            role: 'parent',
+            roomKey: replacement.roomKey,
+          })
+        ).status,
+        403,
+      );
+      assert.equal((await post('state', invited)).status, 200);
+      for (const socket of sockets.splice(0)) {
+        try {
+          socket.close();
+        } catch {}
+      }
+      await runtime.dispose();
+      runtime = new Miniflare(options);
+      await runtime.ready;
+      assert.equal((await post('state', second)).status, 401);
+      assert.equal(
+        (await post('register', { name: 'Old invitation', role: 'parent', roomKey: baby.roomKey }))
+          .status,
+        403,
+      );
+      assert.equal(
+        (await register({ name: 'After restart', role: 'parent', roomKey: latest.roomKey })).roomId,
+        baby.roomId,
+      );
       assert.equal((await post('leave', parent)).status, 200);
       assert.equal((await post('state', parent)).status, 401);
     } finally {

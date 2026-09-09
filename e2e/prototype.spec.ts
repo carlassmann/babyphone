@@ -61,6 +61,14 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
       }
     };
   });
+  await baby.addInitScript(() => {
+    const capture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async (constraints) => {
+      const stream = await capture(constraints);
+      Object.assign(window, { capturedTracks: stream.getTracks() });
+      return stream;
+    };
+  });
   const session = await create(baby, 'Baby', 'Nursery');
   const nurseryCard = parent
     .locator('article')
@@ -147,7 +155,15 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   });
   await nurseryCard.getByRole('button', { name: 'Listen', exact: true }).click();
   await expect(parent.getByText('Listening live', { exact: true })).toBeVisible();
-  await baby.getByRole('button', { name: 'Pause monitoring' }).click();
+  await baby.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
+  expect(
+    await baby.evaluate(() =>
+      (window as Window & { capturedTracks: MediaStreamTrack[] }).capturedTracks.every(
+        (track) => track.readyState === 'ended',
+      ),
+    ),
+  ).toBe(true);
+  await expect(baby.getByRole('button', { name: 'Start monitoring' })).toBeVisible();
   await expect(nurseryCard.getByRole('button', { name: 'Listen', exact: true })).toBeDisabled();
   await expect(parent.getByText('Monitoring paused', { exact: true }).first()).toBeVisible();
   await baby.reload();
@@ -156,6 +172,14 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   await expect(baby.getByLabel('Sound sensitivity')).toHaveValue('3');
   const otherBabyContext = await browser.newContext({ permissions: ['microphone'] });
   const otherBaby = await otherBabyContext.newPage();
+  await otherBaby.addInitScript(() => {
+    const capture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async (constraints) => {
+      const stream = await capture(constraints);
+      Object.assign(window, { capturedTracks: stream.getTracks() });
+      return stream;
+    };
+  });
   await otherBaby.goto(`/#join=${session.roomKey}`);
   await otherBaby.getByRole('button', { name: 'Baby Listen for little sounds' }).click();
   await otherBaby.getByLabel('Device name').fill('Bedroom');
@@ -190,6 +214,23 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
         ),
     )
     .toBe(true);
+  await parent.locator(`audio[data-device-id="${session.deviceId}"]`).evaluate((element) => {
+    (element as HTMLAudioElement).pause();
+  });
+  await expect(nurseryCard.getByRole('button', { name: 'Resume audio' })).toBeVisible();
+  await expect(bedroomCard.getByText('Listening live', { exact: true })).toBeVisible();
+  await nurseryCard.getByRole('button', { name: 'Resume audio' }).click();
+  await expect(nurseryCard.getByText('Listening live', { exact: true })).toBeVisible();
+  const resumedAt = await parent
+    .locator(`audio[data-device-id="${session.deviceId}"]`)
+    .evaluate((element) => (element as HTMLAudioElement).currentTime);
+  await expect
+    .poll(() =>
+      parent
+        .locator(`audio[data-device-id="${session.deviceId}"]`)
+        .evaluate((element) => (element as HTMLAudioElement).currentTime),
+    )
+    .toBeGreaterThan(resumedAt + 0.2);
   await nurseryCard.getByRole('button', { name: 'Stop listening' }).click();
   await expect(parent.locator('audio')).toHaveCount(1);
   await expect(bedroomCard.getByText('Listening live', { exact: true })).toBeVisible();
@@ -202,6 +243,64 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   await parent.screenshot({ path: 'artifacts/parent-dark-dim.png', animations: 'disabled' });
 
   await expect(nurseryCard.getByRole('button', { name: 'Listen', exact: true })).toBeDisabled();
+  await second.getByRole('button', { name: 'Room settings', exact: true }).click();
+  await second.getByRole('button', { name: 'Remove Mom', exact: true }).click();
+  await expect(second.getByRole('button', { name: 'Remove Mom', exact: true })).toHaveCount(0);
+  await expect(parent.getByText('Access removed', { exact: true })).toBeVisible();
+  await expect(parent.locator('audio')).toHaveCount(0);
+  await parent.reload();
+  await expect(parent.getByText('Access removed', { exact: true })).toBeVisible();
+  await parent.getByRole('button', { name: 'Room settings', exact: true }).click();
+  await parent.getByRole('button', { name: 'Leave this room', exact: false }).click();
+  await parent.goto(`/#join=${session.roomKey}`);
+  await parent.getByLabel('Device name').fill('Returning caregiver');
+  await parent.getByRole('button', { name: 'Join room', exact: true }).click();
+  await expect(parent.getByText('Invitation expired. Ask for a new link.')).toBeVisible();
+  await second.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await second.getByRole('button', { name: 'Invite device', exact: true }).click();
+  const afterRemoval = await second.getByLabel('Private invitation code').inputValue();
+  expect(afterRemoval).not.toBe(session.roomKey);
+  await second.getByRole('button', { name: 'Reset invitation link', exact: true }).click();
+  await expect(second.getByLabel('Private invitation code')).not.toHaveValue(afterRemoval);
+  const currentInvitation = await second.getByLabel('Private invitation code').inputValue();
+  await second.screenshot({ path: 'artifacts/reset-invitation.png' });
+  await parent.getByLabel('Invitation code').fill(currentInvitation);
+  await parent.getByRole('button', { name: 'Join room', exact: true }).click();
+  await expect(parent.getByText('Connected', { exact: true })).toBeVisible();
+  await parent.getByRole('button', { name: 'Invite device', exact: true }).click();
+  let releaseReset!: () => void;
+  let resetReached!: () => void;
+  const resetHeld = new Promise<void>((resolve) => (resetReached = resolve));
+  const release = new Promise<void>((resolve) => (releaseReset = resolve));
+  await parent.route('**/api/reset-invitation', async (route) => {
+    const response = await route.fetch();
+    resetReached();
+    await release;
+    await route.fulfill({ response });
+  });
+  await parent.getByRole('button', { name: 'Reset invitation link', exact: true }).click();
+  await resetHeld;
+  const superseded = await second.getByLabel('Private invitation code').inputValue();
+  await second.getByRole('button', { name: 'Reset invitation link', exact: true }).click();
+  await expect(second.getByLabel('Private invitation code')).not.toHaveValue(superseded);
+  const authoritativeInvitation = await second.getByLabel('Private invitation code').inputValue();
+  await expect(parent.getByLabel('Private invitation code')).toHaveValue(authoritativeInvitation);
+  releaseReset();
+  await expect(parent.getByRole('button', { name: 'Reset invitation link' })).toBeEnabled();
+  await expect(parent.getByLabel('Private invitation code')).toHaveValue(authoritativeInvitation);
+  await parent.unroute('**/api/reset-invitation');
+  await parent.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await parent.getByRole('button', { name: 'Room settings', exact: true }).click();
+  await parent.getByRole('button', { name: 'Remove Bedroom', exact: true }).click();
+  await expect(otherBaby.getByText('Access removed', { exact: true })).toBeVisible();
+  await expect(otherBaby.getByRole('button', { name: 'Start monitoring' })).toBeDisabled();
+  expect(
+    await otherBaby.evaluate(() =>
+      (window as Window & { capturedTracks: MediaStreamTrack[] }).capturedTracks.every(
+        (track) => track.readyState === 'ended',
+      ),
+    ),
+  ).toBe(true);
   await otherBabyContext.close();
   await babyContext.close();
   await parentContext.close();
@@ -242,6 +341,37 @@ test('first-run layout, keyboard dialog, invalid invite and denied microphone', 
   await page.reload();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Enable notifications' })).toBeVisible();
+  const previous = await page.evaluate(() => JSON.parse(localStorage.getItem('pip-session')!));
+  const invitationResponse = await page.request.post('/api/register', {
+    data: { role: 'parent', name: 'Host', roomName: 'Caregiver handoff' },
+  });
+  expect(invitationResponse.ok()).toBe(true);
+  const invited = await invitationResponse.json();
+  await page.goto(`/#join=${invited.roomKey}`);
+  await expect(page.getByRole('dialog', { name: 'Open this invitation?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Keep current room' }).click();
+  await expect(page.getByRole('heading', { name: 'Our little nest' })).toBeVisible();
+  await page.goto(`/#join=${invited.roomKey}`);
+  let finishLeaving!: () => void;
+  const leaving = new Promise<void>((resolve) => (finishLeaving = resolve));
+  await page.route('**/api/leave', async (route) => {
+    const response = await route.fetch();
+    await leaving;
+    await route.fulfill({ response });
+  });
+  await page.getByRole('button', { name: 'Leave room and join' }).click();
+  await expect(page.getByRole('button', { name: 'Leaving room…' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Open this invitation?' })).toBeVisible();
+  finishLeaving();
+  await expect(page.getByLabel('Invitation code')).toHaveValue(invited.roomKey);
+  await page.unroute('**/api/leave');
+  await page.getByLabel('Device name').fill('Caregiver');
+  await page.getByRole('button', { name: 'Join room', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Caregiver handoff' })).toBeVisible();
+  await expect(page.getByText('Connected', { exact: true })).toBeVisible();
+  const revoked = await page.request.post('/api/state', { data: previous });
+  expect(revoked.status()).toBe(401);
   await page.getByRole('button', { name: 'Room settings' }).click();
   await page.getByRole('button', { name: 'Leave this room' }).click();
   await expect(page.getByRole('button', { name: 'Create a room' })).toBeVisible();

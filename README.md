@@ -9,6 +9,7 @@ Pip is a working local prototype. Nothing has been deployed.
 ## What you can do
 
 - Pair multiple baby and parent devices in one room without an account.
+- Remove devices from a parent screen and reset invitation links.
 - Listen to multiple babies at once, with separate playback controls.
 - Receive Web Push for sustained sound, paused monitoring, and disconnected baby devices, including when parent tabs are closed.
 - Keep baby and parent screens awake while Pip is open. The app shows when the browser denies wake lock.
@@ -83,9 +84,21 @@ Use a real HTTPS contact URL or email for `VAPID_SUBJECT`; Apple rejects reserve
 
 Without TURN secrets, local audio attempts direct WebRTC using Cloudflare STUN. With secrets configured, failed credential generation is reported rather than silently omitting the relay.
 
+## Invite a caregiver or remove access
+
+From any parent device, choose **Invite device → Copy invite link**. The caregiver opens it, chooses **Me**, names their device, and joins. They can listen live and enable notifications. Invitations do not expire automatically. If their device already belongs to another room, Pip asks whether to leave it before opening the invitation.
+
+To remove access, open **Room settings → Room access → Remove** beside the device. This revokes that device's session, disconnects its live audio, removes its push subscription and queued notifications, and resets the room invitation. Old links stop working. Existing room members stay connected and can copy the new invitation. A notification already accepted by a push provider may still arrive.
+
+**Invite device → Reset invitation link** invalidates old links without removing existing members. Leaving voluntarily removes only that device; it does not reset the invitation.
+
+Every parent has these controls. Pip has no owner or restricted guest role. If someone joined on multiple devices, remove each device. They can regain access only through a fresh invitation shared by a remaining room member.
+
 ## Reliability and privacy
 
 There is no application-level device-count cap. Practical capacity depends on browser and Cloudflare limits. Parents can listen to multiple babies simultaneously, with independent playback controls. Invitation codes are random capabilities; each device also has its own token. The public room ID alone grants no access. Device tokens are stored as hashes; push subscriptions and TURN API tokens are never broadcast.
+
+If the connection drops, Pip stops live playback and reconnects its room connection automatically. Tap Listen again after reconnection to resume audio. If the browser pauses playback, Pip offers Resume audio instead of continuing to say it is listening.
 
 Room WebSockets use Durable Object hibernation and restore socket metadata after eviction. The baby sends a heartbeat every three seconds. A durable alarm checks missing heartbeats from connected baby devices after twelve seconds, including paused baby devices, and records a disconnect event once. Alarm scheduling and delivery are not exact deadlines.
 
