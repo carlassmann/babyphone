@@ -1,0 +1,6 @@
+/*
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  Permissions-Policy: camera=(), microphone=(self), screen-wake-lock=(self)
+/sw.js
+  Cache-Control: no-cache

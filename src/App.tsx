@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Check, Download, Heart } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, Download, Heart, Moon, Sun } from 'lucide-react';
 import { usePwa } from './pwa';
 import { Welcome } from './Welcome';
 import { Room } from './Room';
@@ -9,7 +9,10 @@ import type { Session } from './protocol';
 function readSession(): Session | null {
   try {
     const value = JSON.parse(localStorage.getItem('pip-session') || 'null');
-    return value?.token && value?.deviceId && ['baby', 'parent'].includes(value?.role)
+    return value?.token &&
+      value?.deviceId &&
+      /^[a-f0-9]{64}$/.test(value?.roomId || '') &&
+      ['baby', 'parent'].includes(value?.role)
       ? value
       : null;
   } catch {
@@ -20,6 +23,15 @@ export function App() {
   const [session, setSession] = useState<Session | null>(readSession);
   const [modal, setModal] = useState('');
   const pwa = usePwa();
+  const [theme, setTheme] = useState(
+    () =>
+      localStorage.getItem('pip-theme') ||
+      (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
+  );
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('pip-theme', theme);
+  }, [theme]);
   const appMode = location.pathname.startsWith('/app') || !!session || !!location.hash;
   function save(value: Session | null) {
     if (value) localStorage.setItem('pip-session', JSON.stringify(value));
@@ -40,6 +52,13 @@ export function App() {
           pip{!appMode && <span>little ears. big love.</span>}
         </a>
         <div className="shell-actions">
+          <button
+            className="icon-button"
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          >
+            {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
+          </button>
           {!appMode && (
             <a className="secondary small" href="/app">
               Open Pip

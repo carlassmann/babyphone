@@ -1,25 +1,50 @@
 # Pip
 
-A small, audio-only baby monitor. React + TypeScript, Bun 1.4, Jazz 2.0.0-alpha.53, native WebSockets and WebRTC. Nothing has been deployed.
+A private audio baby monitor PWA. React, TypeScript, and Bun tooling. Cloudflare Workers hosts the app and API. Each room has a SQLite-backed Durable Object for devices, WebSocket signaling, events, and notification retries. Live audio uses WebRTC with Cloudflare Realtime TURN as fallback.
 
-## Try it now
+No Jazz, Vercel, or separate database account is required. No audio is recorded or stored. Browser push delivery still goes through Apple, Google, or Mozilla's push services as required by the browser.
 
-Open **http://localhost:4310**. Create a room, choose Baby, and start monitoring. Open a different browser or private window, join with the invitation code, choose Me, then Listen. Use headphones to avoid feedback when testing both sides on one computer.
+Pip is a working local prototype. Nothing has been deployed.
 
-The default local service stores rooms in `.data/jazz`. It does not need a Jazz Cloud account. Each browser profile remembers one device. Another tab in the same profile takes over that device and stops the old tab safely.
+## What you can do
+
+- Pair multiple baby and parent devices in one room without an account.
+- Listen to multiple babies at once, with separate playback controls.
+- Receive Web Push for sustained sound, paused monitoring, and disconnected baby devices, including when parent tabs are closed.
+- Keep baby and parent screens awake while Pip is open. The app shows when the browser denies wake lock.
+- Adjust each baby's saved sensitivity from any parent device.
+- View and reset room activity, with up to 30 events from the last 24 hours.
+- Install the PWA, switch light/dark appearance, and dim either device's screen.
+
+Real desktop Chrome and Safari testing covered microphones, cross-browser audio, simultaneous listening, push delivery with parent tabs closed, and wake locks. Chrome installation and service-worker updates also passed. Physical locked-phone delivery and Cloudflare TURN across networks still need testing. See [test evidence](TESTING.md).
+
+## Try locally
+
+Prerequisites: Bun, Node 22 or newer for Wrangler, and the local `work` process manager.
 
 ```sh
-bun install --frozen-lockfile
+bun install
 bun run setup
 bun run build
 work up
 ```
 
-`work ps`, `work logs api`, `work restart api`, and `work down` manage the processes. Keep the Mac running while testing. `work run dev` starts optional hot-reload development on port 4314.
+Open http://localhost:4310/app. Create a room, invite a device in a separate browser or profile, choose Baby there, and start monitoring. Tap Listen on the parent. Multiple tabs in the same browser profile share one device identity.
 
-## Two phones, without deploying
+Wrangler runs the backend in local Cloudflare workerd on port 4311, with durable storage under `.data/cloudflare`. Bun runs Vite and project scripts. Wrangler's CLI uses its supported Node launcher. Use `work restart api` after changing local secrets.
 
-Microphone, installation, and push need a trusted HTTPS address. Plain `http://192.168…` cannot access the microphone.
+For hot reload, run `work run dev` and open http://localhost:4314/app. Port 4310 serves the built app, so rebuild after code changes.
+
+Migrating from the Jazz prototype requires a new room. The earlier audio experiment on port 4320 is archived in [the experiment report](docs/jazz-audio-experiment.md).
+
+Development commands:
+
+- `work run dev`: Vite hot reload on port 4314.
+- `work run preview`: production preview on port 4313.
+- `work stop api`: stop the local Worker.
+- `work down`: stop project processes.
+
+## Two phones on your Wi-Fi
 
 ```sh
 bun run setup:https
@@ -27,62 +52,63 @@ bun run build
 work run https
 ```
 
-The script prints your LAN address. At creation it was **https://192.168.0.78:4312**. Both devices must be on the same Wi-Fi. Regenerate the server certificate if the Mac's IP changes.
+The setup command prints the LAN URL on port 4312. Install and trust the local CA from `/pip-local-ca.crt` on each phone. On iOS, enable full trust under Settings → General → About → Certificate Trust Settings. Certificates stay local and must never be committed or deployed.
 
-Trust the development certificate on each test device first. The script creates a private local CA but does not change system trust settings.
+Leave the baby device plugged in, with Pip open and its screen awake. Keep the Mac running while using the local backend. Same-network audio can work without TURN; restrictive networks need relay credentials.
 
-1. Transfer `public/pip-local-ca.crt` to the phone, or download it from `http://192.168.0.78:4310/pip-local-ca.crt` on your own network.
-2. On iPhone/iPad, install the downloaded profile in Settings → General → VPN & Device Management. Then enable this CA under General → About → Certificate Trust Settings.
-3. On Android, install it as a CA certificate in your device's certificate/security settings. On Mac, import the CA into Keychain Access and trust it for SSL.
-4. Open the HTTPS address. On iPhone, Share → Add to Home Screen, then open Pip from that icon.
-5. Create/join a room. Enable notifications on each parent and use **Test notification**. Repeat with Pip in the background and the phone locked.
+## Cloudflare setup
 
-Only distribute the `.crt`, never `.certs/ca.key` or `.certs/server.key`. Remove the development CA from devices after testing. Alternatively, use an existing trusted private HTTPS proxy pointing to port 4310. No tunnel or public hosting was started.
+The Worker and Durable Object configuration is in `wrangler.jsonc`. The `v1` migration creates the Room class with SQLite-backed storage. Static assets come from `dist`; `/app` supports direct navigation and offline launch.
 
-## What to exercise
+1. Sign in with `bunx wrangler login`.
+2. Create a Cloudflare Realtime TURN key in the Cloudflare dashboard.
+3. Add the secrets below to ignored `.dev.vars`. Use your own contact URL or email.
+4. Run `bun run check`, `bun run build`, and `bun run test`. The Worker test bundles with `wrangler deploy --dry-run` and uploads nothing.
+5. When ready to publish, run `bunx wrangler deploy --secrets-file .dev.vars`. This creates the Worker and supplies its secrets in the same deployment. It has not been run.
+6. Open the HTTPS URL printed by Wrangler, pair fresh devices, and complete the [hosted checks](TESTING.md#before-relying-on-the-hosted-app).
 
-- Baby stays plugged in, out of reach, with Pip visible. Start monitoring and check the microphone and wake-lock indicators.
-- Parent sees Monitoring, presses Listen, and hears live audio. Two parents can listen at once; multiple baby devices appear separately.
-- Make a sustained sound for at least 1.5 seconds. All parents should see the alert. The 20-second cooldown prevents repeated notifications.
-- Disable the baby device's network. Parents should see disconnection within roughly 12–14 seconds while the local server runs. Restore it, then press Listen again.
-- Pause monitoring or revoke microphone access. Parents must see monitoring stop.
-- Test a background notification on your actual phones. Focus modes, browser suspension, permissions, and network conditions can delay delivery.
+For later secret changes, use `bunx wrangler secret put NAME`. Keep `.dev.vars` private.
 
-Pip analyzes volume, not whether a baby is crying. It never records audio. Media uses encrypted WebRTC, directly where possible. TURN relays encrypted media when configured. The backend stores room/device metadata, signal metadata for up to a minute, and alerts for up to a day. It also holds push subscriptions, which are never returned in room snapshots.
+| Secret             | Purpose                                         |
+| ------------------ | ----------------------------------------------- |
+| VAPID_PUBLIC_KEY   | Browser push subscription key                   |
+| VAPID_PRIVATE_KEY  | Server push signing key                         |
+| VAPID_SUBJECT      | Contact URI, such as mailto:you@example.com     |
+| TURN_KEY_ID        | Cloudflare Realtime TURN key ID                 |
+| TURN_KEY_API_TOKEN | Server-only token for issuing relay credentials |
 
-This prototype is an extra pair of ears. Keep checking on your baby.
+Use a real HTTPS contact URL or email for `VAPID_SUBJECT`; Apple rejects reserved placeholder domains such as `pip.example` with `BadJwtToken`. If omitted, Pip uses this repository's public URL.
 
-## Networking and push
+`bun run setup` generates local VAPID keys and copies only the push settings into `.dev.vars`. Keep VAPID keys stable after devices subscribe. TURN credentials are generated only for authenticated room devices, cached for five minutes, and valid for 24 hours. New listening connections fetch configuration again. An uninterrupted session exceeding that duration needs credential renewal, which is not yet implemented.
 
-`bun run setup` generates persistent VAPID keys in ignored `.env.local`. Set a real `VAPID_SUBJECT` email before hosting. Notification subscriptions go only to recognized browser push-service hosts. A failed test notification reports an error; expired subscriptions are removed after delivery attempts.
+Without TURN secrets, local audio attempts direct WebRTC using Cloudflare STUN. With secrets configured, failed credential generation is reported rather than silently omitting the relay.
 
-For networks that block direct WebRTC, set `TURN_URL`, `TURN_USERNAME`, and `TURN_CREDENTIAL` in `.env.local`, then `work restart api`. No TURN provider was provisioned. Same-network audio is tested; cellular-to-Wi-Fi relay and physical iOS/Android delivery still need device testing.
+## Reliability and privacy
 
-## Vercel path
+There is no application-level device-count cap. Practical capacity depends on browser and Cloudflare limits. Parents can listen to multiple babies simultaneously, with independent playback controls. Invitation codes are random capabilities; each device also has its own token. The public room ID alone grants no access. Device tokens are stored as hashes; push subscriptions and TURN API tokens are never broadcast.
 
-`api/server.ts` and `vercel.json` prepare the Vite frontend and Bun WebSocket endpoint. A future hosted backend uses `JAZZ_APP_ID`, `JAZZ_SERVER_URL`, `JAZZ_BACKEND_SECRET`, and `APP_ORIGIN`. Jazz holds shared state across function instances; backend reads/writes await the global tier. Direct Jazz client access is denied; the Bun API checks room/device capabilities.
+Room WebSockets use Durable Object hibernation and restore socket metadata after eviction. The baby sends a heartbeat every three seconds. A durable alarm checks missing heartbeats from connected baby devices after twelve seconds, including paused baby devices, and records a disconnect event once. Alarm scheduling and delivery are not exact deadlines.
 
-Do not deploy this configuration as a reliable unattended monitor yet. Before hosting:
+Alert events and per-parent notification jobs are created in one SQLite transaction. Jobs survive runtime restarts, retry failures for up to sixty seconds, and stop retrying invalid push subscriptions. Retries can deliver more than once after an ambiguous response; notification tags use stable event IDs to replace duplicates. Events expire after one day and are capped at thirty per room. Activity shows every stored event, and parents can clear the log for the room. Clearing activity does not cancel notification delivery.
 
-- Provision Jazz v2, publish this schema and backend-only permissions, and validate the native Jazz package in Vercel's Linux runtime.
-- Add a durable watchdog/outbox outside the WebSocket function. Local timers stop when Vercel freezes or ends an invocation. Without that service, a disappeared baby may not trigger background push when every function is idle. Duplicate watchdog delivery must be idempotent.
-- Configure TURN and test real phone background notifications and connection rotation.
-- Add distributed rate limits and validate load/multi-instance timing. The local prototype's rate limits are per process.
+Pip measures sustained sound, not whether a baby is crying. It is an extra pair of ears, not a replacement for checking on your baby.
 
-Vercel now supports WebSockets, but connections expire and reconnects may hit different instances. [Vercel WebSockets](https://vercel.com/docs/functions/websockets), [Bun runtime](https://vercel.com/docs/functions/runtimes/bun), [Jazz server setup](https://jazz.tools/docs/getting-started/server-setup).
+Baby sensitivity is stored per device in its room and can be changed by that baby or any parent in the room. Changes sync immediately and survive reloads. Parents request screen wake lock while the room is open, including Activity and Settings. Wake lock can still be denied or revoked by the OS; Pip displays its status and retries after release, returning to the foreground, or interacting with the screen.
 
-## Checks
+Light/dark appearance and screen dimming are separate, device-local preferences. Dark mode covers the app and dialogs; dimming is available on both baby and parent screens. Both choices persist across reloads.
+
+## Verification
 
 ```sh
 bun run check
-bun test tests
-bunx playwright install chromium webkit
-work run preview
+bun run build
+bun run test
 bun run setup:https
+work up
 work run https
 bun run test:e2e
 ```
 
-The browser suite uses full Chromium with a real synthetic microphone input and WebRTC. It checks received audio energy, multiple parents/babies, alerts, reconnects, persistence, permission denial, role switching, HTTP isolation, offline production loading, and the browser's push event handler. Push-handler tests inject a browser push event; they do not prove delivery through Apple/Google/Mozilla to a physical phone.
+The Workers test exercises real workerd and SQLite persistence with mocked external TURN and push services. Browser tests use synthetic microphones in Chromium and WebKit. See `TESTING.md` for evidence and remaining physical-device checks.
 
-See [TESTING.md](TESTING.md) for evidence and remaining device checks, and `artifacts/` for reviewed mobile/desktop screenshots. The generated mascot and icon provenance are in [ASSETS.md](ASSETS.md).
+References: [Durable Object WebSockets](https://developers.cloudflare.com/durable-objects/best-practices/websockets/), [alarms](https://developers.cloudflare.com/durable-objects/api/alarms/), [Cloudflare TURN credentials](https://developers.cloudflare.com/realtime/turn/generate-credentials/).

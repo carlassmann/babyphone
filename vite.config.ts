@@ -5,14 +5,26 @@ const https = process.env.PIP_HTTPS
   ? { key: readFileSync('.certs/server.key'), cert: readFileSync('.certs/server.crt') }
   : undefined;
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'local-phone-certificate',
+      configurePreviewServer(server) {
+        if (!https) return;
+        server.middlewares.use('/pip-local-ca.crt', (_request, response) => {
+          response.setHeader('Content-Type', 'application/x-x509-ca-cert');
+          response.end(readFileSync('.certs/ca.crt'));
+        });
+      },
+    },
+  ],
   server: {
     host: '0.0.0.0',
     port: 4310,
     strictPort: true,
     allowedHosts: ['.localhost'],
     proxy: {
-      '/api': { target: 'http://localhost:4311', ws: true, xfwd: true, changeOrigin: false },
+      '/api': { target: 'http://127.0.0.1:4311', ws: true, xfwd: true, changeOrigin: false },
     },
   },
   preview: {
@@ -20,6 +32,6 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 4310,
     strictPort: true,
-    proxy: { '/api': { target: 'http://localhost:4311', ws: true, xfwd: true } },
+    proxy: { '/api': { target: 'http://127.0.0.1:4311', ws: true, xfwd: true } },
   },
 });

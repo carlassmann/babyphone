@@ -21,7 +21,7 @@ export class RoomConnection {
     this.onStatus('Connecting');
     this.openedAt = Date.now();
     const socket = (this.socket = new WebSocket(
-      `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/ws`,
+      `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/ws?roomId=${encodeURIComponent(this.session.roomId)}`,
     ));
     socket.onopen = () =>
       socket.send(

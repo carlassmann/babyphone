@@ -23,6 +23,7 @@ import { RoomConnection, request } from './connection';
 import { AudioCalls, BabyAudio } from './media';
 import { enableNotifications, usePwa } from './pwa';
 import { Modal } from './Modal';
+import { useScreenWake } from './useScreenWake';
 import { message, relative } from './format';
 import type { Alert, PublicDevice, Session } from './protocol';
 export function Room({
@@ -44,21 +45,46 @@ export function Room({
   const [busy, setBusy] = useState(false);
   const [modal, setModal] = useState('');
   const [copied, setCopied] = useState('');
-  const [audioStatus, setAudioStatus] = useState('');
-  const [listeningTo, setListeningTo] = useState('');
+  const [audioStatuses, setAudioStatuses] = useState<Record<string, string>>({});
+  const listeningTo = Object.values(audioStatuses).some((status) =>
+    ['Listening live', 'Connecting audio', 'Tap Resume audio to hear your baby.'].includes(status),
+  );
   const [push, setPush] = useState(false);
   const [pushTest, setPushTest] = useState('');
   const [dismissedEvent, setDismissedEvent] = useState('');
   const [sensitivity, setSensitivity] = useState(2);
-  const [dim, setDim] = useState(false);
+  const [dim, setDim] = useState(() => localStorage.getItem('pip-dim') === 'true');
   const [view, setView] = useState('monitor');
   const connectionRef = useRef<RoomConnection>(null);
   const babyRef = useRef<BabyAudio>(null);
   const callsRef = useRef<AudioCalls>(null);
   const stateRef = useRef({ monitoring: false, level: 0 });
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLDivElement>(null);
   const isBaby = session.role === 'baby';
   const connected = connection === 'Connected';
+  const parentAwake = useScreenWake(!isBaby);
+  useEffect(() => {
+    document.documentElement.dataset.dim = String(dim);
+    localStorage.setItem('pip-dim', String(dim));
+    return () => {
+      delete document.documentElement.dataset.dim;
+    };
+  }, [dim]);
+  async function changeSensitivity(target: string, value: number) {
+    try {
+      await request('sensitivity', { ...session, target, sensitivity: value });
+    } catch (error) {
+      setError(message(error));
+    }
+  }
+  async function clearEvents() {
+    try {
+      await request('clear-events', session);
+    } catch (error) {
+      setError(message(error));
+    }
+  }
+
   useEffect(() => {
     const baby = (babyRef.current = new BabyAudio(
       (value) => {
@@ -80,9 +106,9 @@ export function Room({
       () => baby.stream,
       audioRef.current!,
       (status, target) => {
-        setAudioStatus(status);
-        setListeningTo(target || '');
+        setAudioStatuses((current) => (target ? { ...current, [target]: status } : {}));
       },
+      session,
     ));
     let signals = Promise.resolve();
     const room = (connectionRef.current = new RoomConnection(
@@ -91,13 +117,18 @@ export function Room({
         if (data.type === 'state') {
           setDevices(data.devices);
           setEvents(data.events);
+          const own = data.devices.find((device) => device.id === session.deviceId);
+          if (own) {
+            setSensitivity(own.sensitivity);
+            baby.threshold = [0.16, 0.08, 0.035][own.sensitivity - 1]!;
+          }
         }
         if (data.type === 'error') setError(data.message);
         if (data.type === 'signal')
           signals = signals
             .then(() => calls.receive(data.source, data.payload))
             .catch((error) => {
-              calls.stop();
+              calls.stop(data.source);
               setError(message(error));
             });
       },
@@ -178,6 +209,7 @@ export function Room({
   async function testNotification() {
     setBusy(true);
     setError('');
+    setPushTest('');
     try {
       await request('test-push', session);
       setPushTest('Accepted by the push service. Check this device for the test notification.');
@@ -224,14 +256,22 @@ export function Room({
   const babies = devices.filter((device) => device.role === 'baby');
   const parents = devices.filter((device) => device.role === 'parent' && device.online);
   return (
-    <main className={`room ${dim ? 'dimmed' : ''}`}>
-      <audio ref={audioRef} autoPlay playsInline />
+    <main className="room">
+      <div ref={audioRef} hidden />
       <div className="room-heading">
         <div>
           <div className="eyebrow">{isBaby ? 'BABY DEVICE' : 'PARENT DEVICE'}</div>
           <h1>{session.roomName}</h1>
         </div>
         <div className="room-tools">
+          <button
+            className="icon-button"
+            aria-label={dim ? 'Brighten screen' : 'Dim screen'}
+            aria-pressed={dim}
+            onClick={() => setDim(!dim)}
+          >
+            {dim ? <Sun size={19} /> : <Moon size={19} />}
+          </button>
           <button className="secondary small" onClick={() => setModal('invite')}>
             <Plus size={17} /> Invite device
           </button>
@@ -254,6 +294,14 @@ export function Room({
           {session.name} · {isBaby ? 'Baby device' : 'Parent device'}
         </span>
       </div>
+      {!isBaby && (
+        <p className={parentAwake ? 'caption parent-wake' : 'notice'}>
+          <Sun size={15} />{' '}
+          {parentAwake
+            ? 'Screen staying awake'
+            : 'Screen wake lock unavailable. Keep this screen awake manually while listening.'}
+        </p>
+      )}
       {!connected && (
         <p role="alert" className="notice">
           <Wifi size={19} />
@@ -325,9 +373,6 @@ export function Room({
             <>
               <div className="panel-top">
                 <span className="eyebrow">BABY’S SIDE</span>
-                <button className="quiet small" onClick={() => setDim(!dim)}>
-                  {dim ? <Sun size={16} /> : <Moon size={16} />} {dim ? 'Day mode' : 'Night mode'}
-                </button>
               </div>
               <div className="monitor-hero">
                 <img src="/pip-sleeping.png" alt="Pip sleeping" />
@@ -393,12 +438,7 @@ export function Room({
                   max="3"
                   step="1"
                   value={sensitivity}
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
-                    setSensitivity(value);
-                    if (babyRef.current)
-                      babyRef.current.threshold = [0.16, 0.08, 0.035][value - 1]!;
-                  }}
+                  onChange={(e) => void changeSensitivity(session.deviceId, Number(e.target.value))}
                 />
                 <p className="caption">
                   Alerts after 1.5 seconds of sound, with 20 seconds between alerts.
@@ -468,21 +508,40 @@ export function Room({
                           </div>
                         </div>
                         <Meter value={device.monitoring && connected ? device.level : 0} />
+                        <div className="sensitivity">
+                          <label htmlFor={'sensitivity-' + device.id}>
+                            Sound sensitivity{' '}
+                            <span>{['Low', 'Medium', 'High'][device.sensitivity - 1]}</span>
+                          </label>
+                          <input
+                            id={'sensitivity-' + device.id}
+                            aria-label={device.name + ' sound sensitivity'}
+                            type="range"
+                            min="1"
+                            max="3"
+                            step="1"
+                            disabled={!connected}
+                            value={device.sensitivity}
+                            onChange={(event) =>
+                              void changeSensitivity(device.id, Number(event.target.value))
+                            }
+                          />
+                        </div>
                         <div className="device-bottom">
                           <span className="caption">
                             {device.lastNoise
                               ? `Last sound ${relative(device.lastNoise)}`
                               : 'No sounds detected yet'}
                           </span>
-                          {listeningTo === device.id &&
+                          {audioStatuses[device.id] &&
                           [
                             'Listening live',
                             'Connecting audio',
                             'Tap Resume audio to hear your baby.',
-                          ].includes(audioStatus) ? (
+                          ].includes(audioStatuses[device.id] || '') ? (
                             <button
                               className="secondary small"
-                              onClick={() => callsRef.current?.stop()}
+                              onClick={() => callsRef.current?.stop(device.id)}
                             >
                               <Pause size={16} /> Stop listening
                             </button>
@@ -492,7 +551,7 @@ export function Room({
                               disabled={!connected || !device.monitoring}
                               onClick={() =>
                                 void callsRef.current?.listen(device.id).catch((error) => {
-                                  callsRef.current?.stop();
+                                  callsRef.current?.stop(device.id);
                                   setError(message(error));
                                 })
                               }
@@ -501,16 +560,15 @@ export function Room({
                             </button>
                           )}
                         </div>
-                        {listeningTo === device.id && (
+                        {audioStatuses[device.id] && (
                           <div className="audio-status" role="status">
                             <AudioLines size={16} />
-                            {audioStatus}
-                            {audioStatus.includes('Resume') && (
+                            {audioStatuses[device.id]}
+                            {audioStatuses[device.id]?.includes('Resume') && (
                               <button
                                 onClick={() =>
-                                  void audioRef.current
-                                    ?.play()
-                                    .then(() => setAudioStatus('Listening live'))
+                                  void callsRef.current
+                                    ?.resume(device.id)
                                     .catch((error) => setError(message(error)))
                                 }
                               >
@@ -578,8 +636,8 @@ export function Room({
                   </p>
                 )}
                 <p className="caption">
-                  On iPhone, install Pip first. Notifications can be delayed by your device or
-                  network.
+                  Allow notifications in your device settings too. On iPhone, install Pip first.
+                  Notifications can be delayed by your device or network.
                 </p>
               </>
             )}
@@ -587,11 +645,16 @@ export function Room({
           <section className="side-card activity" hidden={view !== 'activity'}>
             <div className="section-heading">
               <h3>Activity</h3>
-              <span className="caption">Today</span>
+              <span className="caption">Last 24 hours</span>
+              {!isBaby && events.length > 0 && (
+                <button className="quiet small" onClick={() => void clearEvents()}>
+                  Clear activity
+                </button>
+              )}
             </div>
             {events.length ? (
               <div className="event-list">
-                {events.slice(0, 6).map((event) => (
+                {events.map((event) => (
                   <div className="event" key={event.id}>
                     <span className={`event-icon ${event.kind !== 'noise' ? 'warning' : ''}`}>
                       {event.kind === 'noise' ? <AudioLines size={16} /> : <Wifi size={16} />}

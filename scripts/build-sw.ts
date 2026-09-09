@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
+import { rm } from 'node:fs/promises';
+await rm('dist/pip-local-ca.crt', { force: true });
 const assets = Array.from(new Bun.Glob('**/*').scanSync('dist'))
-  .filter((path) => path !== 'sw.js')
+  .filter((path) => path !== 'sw.js' && path !== '_headers')
   .sort()
   .map((path) => `/${path}`);
 const source = await Bun.file('public/sw.js').text();

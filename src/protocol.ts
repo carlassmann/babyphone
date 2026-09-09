@@ -16,6 +16,7 @@ export type PublicDevice = {
   monitoring: boolean;
   level: number;
   lastNoise: number;
+  sensitivity: number;
   lastSeen: number;
 };
 export type Alert = {

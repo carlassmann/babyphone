@@ -9,4 +9,12 @@ if (!(await Bun.file('.env.local').exists())) {
   );
 }
 await chmod('.env.local', 0o600);
-console.log('Local storage and push keys ready.');
+if (!(await Bun.file('.dev.vars').exists())) {
+  const local = await Bun.file('.env.local').text();
+  const push = local
+    .split('\n')
+    .filter((line) => /^VAPID_(PUBLIC_KEY|PRIVATE_KEY|SUBJECT)=/.test(line));
+  await Bun.write('.dev.vars', push.join('\n') + '\n');
+}
+await chmod('.dev.vars', 0o600);
+console.log('Local Workers storage and push keys ready.');

@@ -862,43 +862,6 @@ hr {
 .danger {
   color: var(--danger);
 }
-.dimmed {
-  background: #192539;
-  color: #cbd6e9;
-  border-radius: 20px;
-  padding: 30px 22px;
-}
-.dimmed .monitor-panel,
-.dimmed .side-card {
-  background: #25334a;
-  border-color: #40506b;
-}
-.dimmed p,
-.dimmed .caption,
-.dimmed .eyebrow,
-.dimmed .status {
-  color: #b0bfd6;
-}
-.dimmed .monitor-hero img {
-  opacity: 0.65;
-}
-.dimmed .primary {
-  background: #425575;
-  color: #e4eaf4;
-}
-.dimmed .room-status,
-.dimmed .sensitivity {
-  border-color: #40506b;
-}
-.dimmed .sensitivity label {
-  color: #cbd6e9;
-}
-.dimmed .meter span {
-  background: #40506b;
-}
-.dimmed .meter span.lit {
-  background: #92b9a3;
-}
 @media (min-width: 1100px) {
   .welcome-art h1 {
     font-size: 62px;
@@ -1197,9 +1160,6 @@ hr {
     font-size: 10px;
     padding: 0 20px;
   }
-  .dimmed {
-    padding: 20px 12px;
-  }
   .modal-content {
     padding: 36px 24px 26px;
   }
@@ -1335,13 +1295,6 @@ hr {
 .app-onboarding .setup {
   max-width: none;
 }
-.dimmed .app-navigation {
-  background: #25334a;
-}
-.dimmed .app-navigation button[aria-current='page'] {
-  background: #425575;
-  color: #e4eaf4;
-}
 @media (max-width: 680px) {
   .application {
     padding: 0 16px;
@@ -1385,5 +1338,102 @@ hr {
   }
   .application .meter-wrap {
     margin-top: 18px;
+  }
+}
+
+.parent-wake {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  color: #dae4f4;
+  background: #121c2b;
+  --ink: #dae4f4;
+  --muted: #a4b5cd;
+  --blue: #5676ad;
+  --sky: #22324b;
+  --line: #354761;
+  --green: #96c5af;
+  --danger: #f1b797;
+}
+[data-theme='dark'] .secondary,
+[data-theme='dark'] .monitor-panel,
+[data-theme='dark'] .side-card,
+[data-theme='dark'] .application .side-card,
+[data-theme='dark'] .role-picker button,
+[data-theme='dark'] input:not([type='range']),
+[data-theme='dark'] dialog {
+  background: #1b293d;
+  color: var(--ink);
+  border-color: var(--line);
+}
+[data-theme='dark'] .welcome-art,
+[data-theme='dark'] .instructions,
+[data-theme='dark'] .role-picker button[aria-pressed='true'],
+[data-theme='dark'] .app-navigation,
+[data-theme='dark'] .stop,
+[data-theme='dark'] .app-navigation button[aria-current='page'] {
+  background: var(--sky);
+  color: var(--ink);
+}
+[data-theme='dark'] .app-navigation button[aria-current='page'] {
+  background: #354b6b;
+}
+[data-theme='dark'] .meter span {
+  background: #354761;
+}
+[data-theme='dark'] .meter .lit {
+  background: #96c5af;
+}
+[data-theme='dark'] .notice {
+  background: #443124;
+  color: #f1c2a6;
+}
+[data-theme='dark'] .notice.success,
+[data-theme='dark'] .audio-status {
+  background: #233e36;
+  color: #ade0c4;
+}
+[data-theme='dark'] .status.amber {
+  color: #e4bc83;
+}
+[data-theme='dark'] .tiny-moon,
+[data-theme='dark'] .device-icon,
+[data-theme='dark'] .section-icon {
+  background: #453d2d;
+  color: #ecd39b;
+}
+[data-theme='dark'] .mascot,
+[data-theme='dark'] .monitor-hero img,
+[data-theme='dark'] .empty-nest img {
+  mix-blend-mode: normal;
+  opacity: 0.85;
+}
+:root[data-dim='true']::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 40%);
+  pointer-events: none;
+  z-index: 1000;
+}
+:root[data-dim='true'] dialog {
+  filter: brightness(0.6);
+}
+@media (max-width: 680px) {
+  .application .shell-actions {
+    gap: 6px;
+  }
+  .application .room-heading h1 {
+    font-size: 23px;
+  }
+  .application .section-heading {
+    flex-wrap: wrap;
+  }
+  .application .room-tools {
+    flex-shrink: 0;
   }
 }

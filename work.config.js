@@ -2,7 +2,7 @@ export default {
   project: 'pip',
   commands: {
     api: {
-      run: 'bun --env-file=.env.local server/index.ts',
+      run: 'bunx wrangler dev --local --ip 127.0.0.1 --port 4311 --persist-to .data/cloudflare',
       autoStart: true,
       restart: 'on-exit',
       portless: false,

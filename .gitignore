@@ -43,3 +43,9 @@ public/pip-local-ca.crt
 # local captures
 artifacts/
 .vercel/
+
+.wrangler/
+.worker-build/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example

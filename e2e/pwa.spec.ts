@@ -8,11 +8,11 @@ test('production shell survives offline reload without claiming monitoring; brow
   let registrationId = '';
   cdp.on('ServiceWorker.workerRegistrationUpdated', (event) => {
     registrationId =
-      event.registrations.find((r) => r.scopeURL === 'http://localhost:4313/')?.registrationId ||
+      event.registrations.find((r) => r.scopeURL === 'http://localhost:4311/')?.registrationId ||
       registrationId;
   });
   await cdp.send('ServiceWorker.enable');
-  await page.goto('http://localhost:4313/');
+  await page.goto('http://localhost:4311/');
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
   });
@@ -21,7 +21,7 @@ test('production shell survives offline reload without claiming monitoring; brow
   await page.getByRole('button', { name: 'Create a room' }).click();
   await page.getByRole('button', { name: 'Create room', exact: true }).click();
   await expect(page.getByText('Connected', { exact: true })).toBeVisible();
-  await expect(page).toHaveURL('http://localhost:4313/app');
+  await expect(page).toHaveURL('http://localhost:4311/app');
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Our little nest' })).toBeVisible();
@@ -30,7 +30,7 @@ test('production shell survives offline reload without claiming monitoring; brow
   await context.setOffline(false);
   await expect(page.getByText('Connected', { exact: true })).toBeVisible();
   await cdp.send('ServiceWorker.deliverPushMessage', {
-    origin: 'http://localhost:4313',
+    origin: 'http://localhost:4311',
     registrationId,
     data: JSON.stringify({
       title: 'Noise detected',

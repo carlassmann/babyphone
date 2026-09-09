@@ -24,6 +24,33 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   const parent = await parentContext.newPage();
   const second = await secondContext.newPage();
   await parent.addInitScript(() => {
+    const wake = {
+      requests: 0,
+      releases: 0,
+      current: null as (EventTarget & { release: () => Promise<void>; released: boolean }) | null,
+    };
+    Object.assign(window, { observedWake: wake });
+    Object.defineProperty(navigator, 'wakeLock', {
+      value: {
+        async request() {
+          wake.requests++;
+          if (wake.requests === 1)
+            throw new DOMException('Try after interaction', 'NotAllowedError');
+          const lock = Object.assign(new EventTarget(), {
+            released: false,
+            async release() {
+              if (lock.released) return;
+              lock.released = true;
+              wake.releases++;
+              lock.dispatchEvent(new Event('release'));
+            },
+          });
+          wake.current = lock;
+          return lock;
+        },
+      },
+    });
+
     const Original = window.RTCPeerConnection;
     const peers: RTCPeerConnection[] = [];
     Object.assign(window, { observedPeers: peers });
@@ -47,6 +74,18 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
     await page.getByRole('button', { name: 'Join room', exact: true }).click();
     await expect(page.getByText('Connected', { exact: true })).toBeVisible();
   }
+  await expect(parent.getByText('Screen wake lock unavailable.', { exact: false })).toBeVisible();
+  await parent.getByRole('button', { name: 'Monitor', exact: true }).click();
+  await expect(parent.getByText('Screen staying awake', { exact: true })).toBeVisible();
+  await parent.evaluate(() => (window as any).observedWake.current.release());
+  await expect
+    .poll(() => parent.evaluate(() => (window as any).observedWake.requests))
+    .toBeGreaterThan(2);
+  await parent.getByLabel('Nursery sound sensitivity').fill('3');
+  await expect(baby.getByLabel('Sound sensitivity')).toHaveValue('3');
+  await expect(second.getByLabel('Nursery sound sensitivity')).toHaveValue('3');
+  await second.getByLabel('Nursery sound sensitivity').fill('1');
+  await expect(parent.getByLabel('Nursery sound sensitivity')).toHaveValue('1');
   await baby.getByRole('button', { name: 'Start monitoring' }).click();
   await expect(baby.getByRole('button', { name: 'Pause monitoring' })).toBeVisible();
   await expect(nurseryCard.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
@@ -114,6 +153,7 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   await baby.reload();
   await expect(baby.getByRole('heading', { name: 'Our little nest' })).toBeVisible();
   await expect(baby.getByRole('button', { name: 'Start monitoring' })).toBeVisible();
+  await expect(baby.getByLabel('Sound sensitivity')).toHaveValue('3');
   const otherBabyContext = await browser.newContext({ permissions: ['microphone'] });
   const otherBaby = await otherBabyContext.newPage();
   await otherBaby.goto(`/#join=${session.roomKey}`);
@@ -128,6 +168,39 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   await expect(parent.locator('article')).toHaveCount(2);
   await bedroomCard.getByRole('button', { name: 'Listen', exact: true }).click();
   await expect(bedroomCard.getByText('Listening live', { exact: true })).toBeVisible();
+  await baby.getByRole('button', { name: 'Start monitoring' }).click();
+  await nurseryCard.getByRole('button', { name: 'Listen', exact: true }).click();
+  await expect(nurseryCard.getByText('Listening live', { exact: true })).toBeVisible();
+  await expect(parent.locator('audio')).toHaveCount(2);
+  const playback = await parent
+    .locator('audio')
+    .evaluateAll((elements) =>
+      elements.map((element) => (element as HTMLAudioElement).currentTime),
+    );
+  await expect
+    .poll(() =>
+      parent
+        .locator('audio')
+        .evaluateAll(
+          (elements, initial) =>
+            elements.every(
+              (element, index) => (element as HTMLAudioElement).currentTime > initial[index]! + 0.2,
+            ),
+          playback,
+        ),
+    )
+    .toBe(true);
+  await nurseryCard.getByRole('button', { name: 'Stop listening' }).click();
+  await expect(parent.locator('audio')).toHaveCount(1);
+  await expect(bedroomCard.getByText('Listening live', { exact: true })).toBeVisible();
+  await baby.getByRole('button', { name: 'Pause monitoring' }).click();
+  await parent.getByRole('button', { name: 'Switch to dark mode' }).click();
+  await parent.getByRole('button', { name: 'Dim screen', exact: true }).click();
+  await expect(parent.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(parent.locator('html')).toHaveAttribute('data-dim', 'true');
+  await parent.setViewportSize({ width: 390, height: 844 });
+  await parent.screenshot({ path: 'artifacts/parent-dark-dim.png', animations: 'disabled' });
+
   await expect(nurseryCard.getByRole('button', { name: 'Listen', exact: true })).toBeDisabled();
   await otherBabyContext.close();
   await babyContext.close();
@@ -172,5 +245,9 @@ test('first-run layout, keyboard dialog, invalid invite and denied microphone', 
   await page.getByRole('button', { name: 'Room settings' }).click();
   await page.getByRole('button', { name: 'Leave this room' }).click();
   await expect(page.getByRole('button', { name: 'Create a room' })).toBeVisible();
+  await page.getByRole('button', { name: 'Switch to dark mode' }).click();
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
   await context.close();
 });

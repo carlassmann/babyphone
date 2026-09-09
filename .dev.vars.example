@@ -1,0 +1,7 @@
+# Wrangler local secrets. Copy to .dev.vars, or run bun run setup for VAPID keys.
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:you@example.com
+# Optional locally; required for a hosted TURN fallback.
+TURN_KEY_ID=
+TURN_KEY_API_TOKEN=

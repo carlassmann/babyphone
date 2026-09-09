@@ -1,10 +1,12 @@
 import { NoiseDetector, rms } from './noise';
-import type { Signal } from './protocol';
+import type { Signal, Session } from './protocol';
+import { request } from './connection';
 export class BabyAudio {
   stream?: MediaStream;
   private context?: AudioContext;
   private timer?: ReturnType<typeof setInterval>;
   private wake?: WakeLockSentinel;
+  private wakePending = false;
   private detector = new NoiseDetector();
   private active = false;
   private generation = 0;
@@ -54,6 +56,8 @@ export class BabyAudio {
       if (this.detector.sample(volume, performance.now())) this.onNoise();
     }, 100);
     document.addEventListener('visibilitychange', this.visibility);
+    document.addEventListener('pointerdown', this.visibility);
+    window.addEventListener('focus', this.visibility);
     await this.acquireWake();
   }
   private fail(message: string) {
@@ -64,14 +68,17 @@ export class BabyAudio {
     if (document.visibilityState === 'visible' && this.active) void this.acquireWake();
   };
   private async acquireWake() {
+    if (!this.active || this.wakePending) return;
     if (!('wakeLock' in navigator) || document.visibilityState !== 'visible') {
       this.onWake(false);
       return;
     }
+    if (this.wake && !this.wake.released) return;
+    this.wakePending = true;
+    const generation = this.generation;
     try {
-      if (this.wake && !this.wake.released) return;
       const wake = await navigator.wakeLock.request('screen');
-      if (!this.active) {
+      if (!this.active || generation !== this.generation) {
         await wake.release();
         return;
       }
@@ -86,6 +93,8 @@ export class BabyAudio {
       });
     } catch {
       this.onWake(false);
+    } finally {
+      this.wakePending = false;
     }
   }
   stop() {
@@ -93,6 +102,8 @@ export class BabyAudio {
     this.active = false;
     clearInterval(this.timer);
     document.removeEventListener('visibilitychange', this.visibility);
+    document.removeEventListener('pointerdown', this.visibility);
+    window.removeEventListener('focus', this.visibility);
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = undefined;
     void this.context?.close();
@@ -106,6 +117,7 @@ export class BabyAudio {
 
 type Call = {
   peer: RTCPeerConnection;
+  audio?: HTMLAudioElement;
   target: string;
   callId: string;
   pending: RTCIceCandidateInit[];
@@ -115,6 +127,7 @@ export class AudioCalls {
   private calls = new Map<string, Call>();
   private iceServers: RTCIceServer[] = [];
   private generation = 0;
+  private attempts = new Map<string, number>();
   private earlyCandidates = new Map<
     string,
     { source: string; candidates: RTCIceCandidateInit[]; at: number }
@@ -122,17 +135,24 @@ export class AudioCalls {
   constructor(
     private send: (target: string, payload: Signal) => void,
     private stream: () => MediaStream | undefined,
-    private audio: HTMLAudioElement,
+    private audioContainer: HTMLDivElement,
     private onStatus: (state: string, target?: string) => void,
+    private session: Session,
   ) {}
   async configure() {
-    const response = await fetch('/api/config');
-    if (!response.ok) throw new Error('Audio configuration unavailable.');
-    this.iceServers = (await response.json()).iceServers;
+    this.iceServers = (await request('ice', this.session)).iceServers;
   }
   private create(target: string, callId: string, listening: boolean) {
     const peer = new RTCPeerConnection({ iceServers: this.iceServers });
+    const audio = listening ? document.createElement('audio') : undefined;
+    if (audio) {
+      audio.autoplay = true;
+      audio.setAttribute('playsinline', '');
+      audio.dataset.deviceId = target;
+      this.audioContainer.append(audio);
+    }
     const call: Call = {
+      audio,
       peer,
       target,
       callId,
@@ -152,7 +172,7 @@ export class AudioCalls {
         clearTimeout(call.timeout);
         if (listening)
           this.onStatus(
-            this.audio.paused ? 'Tap Resume audio to hear your baby.' : 'Listening live',
+            call.audio?.paused ? 'Tap Resume audio to hear your baby.' : 'Listening live',
             target,
           );
       }
@@ -162,8 +182,9 @@ export class AudioCalls {
       }
     };
     peer.ontrack = (event) => {
-      this.audio.srcObject = event.streams[0] || new MediaStream([event.track]);
-      void this.audio
+      if (!call.audio) return;
+      call.audio.srcObject = event.streams[0] || new MediaStream([event.track]);
+      void call.audio
         .play()
         .then(() => {
           if (this.calls.has(callId)) this.onStatus('Listening live', target);
@@ -175,11 +196,12 @@ export class AudioCalls {
     return call;
   }
   async listen(target: string) {
-    this.stop();
+    this.stop(target);
     const generation = this.generation;
+    const attempt = this.attempts.get(target);
     this.onStatus('Connecting audio', target);
     await this.configure();
-    if (generation !== this.generation) return;
+    if (generation !== this.generation || attempt !== this.attempts.get(target)) return;
     const callId = crypto.randomUUID();
     const { peer } = this.create(target, callId, true);
     peer.addTransceiver('audio', { direction: 'recvonly' });
@@ -209,7 +231,7 @@ export class AudioCalls {
     if (signal.kind === 'stop') {
       if (call && call.target === source) {
         this.end(signal.callId, false);
-        this.onStatus('Audio stopped');
+        this.onStatus('Audio stopped', source);
       }
       return;
     }
@@ -255,15 +277,26 @@ export class AudioCalls {
     clearTimeout(call.timeout);
     call.peer.close();
     if (notify) this.send(call.target, { kind: 'stop', callId: id });
-    if (!this.calls.size) {
-      this.audio.pause();
-      this.audio.srcObject = null;
+    if (call.audio) {
+      call.audio.pause();
+      call.audio.srcObject = null;
+      call.audio.remove();
+      this.onStatus('', call.target);
     }
   }
-  stop() {
-    ++this.generation;
-    this.earlyCandidates.clear();
-    for (const id of [...this.calls.keys()]) this.end(id);
-    this.onStatus('');
+  async resume(target: string) {
+    const call = [...this.calls.values()].find((item) => item.target === target && item.audio);
+    if (!call?.audio) return;
+    await call.audio.play();
+    this.onStatus('Listening live', target);
+  }
+  stop(target?: string) {
+    if (target) this.attempts.set(target, (this.attempts.get(target) || 0) + 1);
+    if (!target) {
+      ++this.generation;
+      this.earlyCandidates.clear();
+    }
+    for (const [id, call] of this.calls) if (!target || call.target === target) this.end(id);
+    this.onStatus('', target);
   }
 }
