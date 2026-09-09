@@ -104,3 +104,6 @@ TypeScript, the production build, the Bun noise test, and workerd integration te
 The browser lifecycle switches rooms during live audio, verifies playback stops, returns to the saved room, and resumes listening explicitly. Setup coverage checks invitation switching without revoking the previous membership, room renaming and persistence after reload, and rejection and forgetting of a revoked saved membership.
 
 The workerd checks cover parent-only room renaming, device rename authorization and room isolation, deactivation retaining membership while disabling push, rejection of late subscription requests, reactivation and subscription attachment, and baby deactivation clearing monitoring and online status. Push delivery after switching on a physical phone remains a deployment check.
+
+
+The camera invitation test decodes a real QR from a synthetic video stream, verifies code entry and track shutdown after scanning and cancellation, and checks permission denial leaves manual entry available. Chromium passed in 2.2 seconds. Physical iPhone camera scanning remains unverified.

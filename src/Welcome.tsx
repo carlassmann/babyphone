@@ -1,15 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from '@tanstack/react-router';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Bell,
-  Headphones,
-  Link,
-  Mic,
-  Moon,
-  Smartphone,
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bell, Headphones, Link, Mic, Moon, Smartphone } from 'lucide-react';
+import { InvitationScanner } from './InvitationScanner';
 import { request } from './connection';
 import { message } from './format';
 import type { Role, Session } from './protocol';
@@ -30,6 +22,11 @@ export function Welcome({
       : route.pathname === '/app/create' || legacySetup === 'create'
         ? 'create'
         : '';
+  const [scanning, setScanning] = useState(false);
+  const scanned = useCallback((code: string) => {
+    setRoomKey(code);
+    setScanning(false);
+  }, []);
   const [role, setRole] = useState<Role>('parent');
   const [name, setName] = useState('');
   const [roomKey, setRoomKey] = useState(invited);
@@ -140,19 +137,27 @@ export function Welcome({
                 : 'Start here, then invite your other device.'}
             </p>
             {mode === 'join' ? (
-              <label>
-                Invitation code
-                <input
-                  required
-                  className="invitation-code"
-                  value={roomKey}
-                  onChange={(e) => setRoomKey(e.target.value)}
-                  placeholder="Paste your room code"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                />
-              </label>
+              <>
+                <label>
+                  Invitation code
+                  <input
+                    required
+                    className="invitation-code"
+                    value={roomKey}
+                    onChange={(e) => setRoomKey(e.target.value)}
+                    placeholder="Paste your room code"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                </label>
+                <button type="button" className="secondary full" onClick={() => setScanning(true)}>
+                  Scan QR code
+                </button>
+                {scanning && (
+                  <InvitationScanner onScan={scanned} close={() => setScanning(false)} />
+                )}
+              </>
             ) : (
               <label>
                 Room name

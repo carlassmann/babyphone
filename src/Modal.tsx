@@ -28,7 +28,12 @@ export function Modal({
       }}
     >
       <div className="modal-content">
-        <button className="icon-button modal-close" onClick={close} aria-label="Close dialog">
+        <button
+          type="button"
+          className="icon-button modal-close"
+          onClick={close}
+          aria-label="Close dialog"
+        >
           <X size={19} />
         </button>
         <h2>{title}</h2>
