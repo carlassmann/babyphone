@@ -762,7 +762,7 @@ export function Room({
               </p>
               <label>
                 Private invitation code
-                <input readOnly value={invitation} onFocus={(e) => e.target.select()} />
+                <input className="invitation-code" readOnly value={invitation} onFocus={(e) => e.target.select()} />
               </label>
               <div className="invite-actions">
                 <button

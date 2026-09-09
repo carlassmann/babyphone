@@ -1504,3 +1504,9 @@ hr {
 .rename-field .notice {
   width: 100%;
 }
+
+.invitation-code {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-variant-numeric: slashed-zero;
+  font-variant-ligatures: none;
+}

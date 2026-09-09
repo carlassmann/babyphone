@@ -144,6 +144,7 @@ export function Welcome({
                 Invitation code
                 <input
                   required
+                  className="invitation-code"
                   value={roomKey}
                   onChange={(e) => setRoomKey(e.target.value)}
                   placeholder="Paste your room code"
