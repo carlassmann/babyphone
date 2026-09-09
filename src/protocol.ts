@@ -27,7 +27,14 @@ export type Alert = {
   at: number;
 };
 export type ServerMessage =
-  | { type: 'state'; roomKey?: string; devices: PublicDevice[]; events: Alert[]; at: number }
+  | {
+      type: 'state';
+      roomKey?: string;
+      roomName?: string;
+      devices: PublicDevice[];
+      events: Alert[];
+      at: number;
+    }
   | { type: 'signal'; source: string; payload: Signal }
   | { type: 'error'; message: string }
   | { type: 'ready' };

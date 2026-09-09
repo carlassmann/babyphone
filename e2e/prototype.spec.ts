@@ -24,6 +24,24 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   const parent = await parentContext.newPage();
   const second = await secondContext.newPage();
   await parent.addInitScript(() => {
+    const register = navigator.serviceWorker.register.bind(navigator.serviceWorker);
+    navigator.serviceWorker.register = async (...args) => {
+      const registration = await register(...args);
+      const worker = Object.assign(new EventTarget(), {
+        state: 'installed',
+        postMessage: () => {
+          (window as any).updateRequested = true;
+        },
+      });
+      Object.assign(window, {
+        offerUpdate: () => {
+          Object.defineProperty(registration, 'installing', { value: worker, configurable: true });
+          registration.dispatchEvent(new Event('updatefound'));
+          worker.dispatchEvent(new Event('statechange'));
+        },
+      });
+      return registration;
+    };
     const wake = {
       requests: 0,
       releases: 0,
@@ -83,7 +101,7 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
     await expect(page.getByText('Connected', { exact: true })).toBeVisible();
   }
   await expect(parent.getByText('Screen wake lock unavailable.', { exact: false })).toBeVisible();
-  await parent.getByRole('button', { name: 'Monitor', exact: true }).click();
+  await parent.getByRole('link', { name: 'Monitor', exact: true }).click();
   await expect(parent.getByText('Screen staying awake', { exact: true })).toBeVisible();
   await parent.evaluate(() => (window as any).observedWake.current.release());
   await expect
@@ -128,11 +146,23 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
       }),
     )
     .toBeGreaterThan(0);
+  await expect.poll(() => parent.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  await parent.evaluate(() => (window as any).offerUpdate());
+  await expect(parent.getByText('Pip update available', { exact: true })).toBeVisible();
+  await expect(parent.getByText('Pause monitoring and listening before updating.')).toBeVisible();
+  await expect(parent.getByRole('button', { name: 'Update', exact: true })).toHaveCount(0);
   await second.getByRole('button', { name: 'Listen', exact: true }).click();
   await expect(second.getByText('Listening live', { exact: true })).toBeVisible();
   await baby.getByLabel('Sound sensitivity').fill('3');
-  await parent.getByRole('button', { name: 'Activity', exact: true }).click();
-  await second.getByRole('button', { name: 'Activity', exact: true }).click();
+  await parent.getByRole('link', { name: 'Activity', exact: true }).click();
+  await second.getByRole('link', { name: 'Activity', exact: true }).click();
+  await expect(parent).toHaveURL(/\/app\/activity$/);
+  await parent.goBack();
+  await expect(parent).toHaveURL(/\/app$/);
+  await expect(parent.getByText('Listening live', { exact: true })).toBeVisible();
+  await parent.goForward();
+  await expect(parent).toHaveURL(/\/app\/activity$/);
+  await parent.getByRole('button', { name: 'Close toast' }).click();
   const playingAt = await parent
     .locator('audio')
     .evaluate((audio: HTMLAudioElement) => audio.currentTime);
@@ -147,7 +177,7 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   await expect(parent.getByText('Device disconnected', { exact: true })).toBeVisible({
     timeout: 25000,
   });
-  await parent.getByRole('button', { name: 'Monitor', exact: true }).click();
+  await parent.getByRole('link', { name: 'Monitor', exact: true }).click();
   await expect(nurseryCard.getByRole('button', { name: 'Listen', exact: true })).toBeDisabled();
   await babyContext.setOffline(false);
   await expect(nurseryCard.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled({
@@ -234,8 +264,24 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   await nurseryCard.getByRole('button', { name: 'Stop listening' }).click();
   await expect(parent.locator('audio')).toHaveCount(1);
   await expect(bedroomCard.getByText('Listening live', { exact: true })).toBeVisible();
+  await parent.getByRole('button', { name: 'Switch room', exact: true }).click();
+  await parent.getByRole('button', { name: 'Create a room', exact: true }).click();
+  await expect(parent.locator('audio')).toHaveCount(0);
+  await parent.getByLabel('Room name').fill('Travel room');
+  await parent.getByRole('button', { name: 'Create room', exact: true }).click();
+  await expect(parent.getByRole('heading', { name: 'Travel room' })).toBeVisible();
+  await parent.getByRole('button', { name: 'Switch room', exact: true }).click();
+  await parent.getByRole('button', { name: /Our little nest.*Mom/ }).click();
+  await expect(nurseryCard).toBeVisible();
+  await expect(parent.locator('audio')).toHaveCount(0);
+  const updateToast = parent.getByRole('button', { name: 'Close toast' });
+  if (await updateToast.isVisible()) await updateToast.click();
+  await bedroomCard.getByRole('button', { name: 'Listen', exact: true }).click();
+  await expect(bedroomCard.getByText('Listening live', { exact: true })).toBeVisible();
   await baby.getByRole('button', { name: 'Pause monitoring' }).click();
+  await parent.getByRole('link', { name: 'Settings', exact: true }).click();
   await parent.getByRole('button', { name: 'Switch to dark mode' }).click();
+  await parent.getByRole('link', { name: 'Monitor', exact: true }).click();
   await parent.getByRole('button', { name: 'Dim screen', exact: true }).click();
   await expect(parent.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(parent.locator('html')).toHaveAttribute('data-dim', 'true');
@@ -243,14 +289,19 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   await parent.screenshot({ path: 'artifacts/parent-dark-dim.png', animations: 'disabled' });
 
   await expect(nurseryCard.getByRole('button', { name: 'Listen', exact: true })).toBeDisabled();
-  await second.getByRole('button', { name: 'Room settings', exact: true }).click();
+  await second.getByRole('link', { name: 'Settings', exact: true }).click();
+  await second.getByRole('button', { name: 'Manage this device', exact: true }).click();
   await second.getByRole('button', { name: 'Remove Mom', exact: true }).click();
   await expect(second.getByRole('button', { name: 'Remove Mom', exact: true })).toHaveCount(0);
   await expect(parent.getByText('Access removed', { exact: true })).toBeVisible();
   await expect(parent.locator('audio')).toHaveCount(0);
+  await expect(parent.getByRole('button', { name: 'Update', exact: true })).toBeVisible();
+  await parent.getByRole('button', { name: 'Update', exact: true }).click();
+  await expect.poll(() => parent.evaluate(() => (window as any).updateRequested)).toBe(true);
   await parent.reload();
   await expect(parent.getByText('Access removed', { exact: true })).toBeVisible();
-  await parent.getByRole('button', { name: 'Room settings', exact: true }).click();
+  await parent.getByRole('link', { name: 'Settings', exact: true }).click();
+  await parent.getByRole('button', { name: 'Manage this device', exact: true }).click();
   await parent.getByRole('button', { name: 'Leave this room', exact: false }).click();
   await parent.goto(`/#join=${session.roomKey}`);
   await parent.getByLabel('Device name').fill('Returning caregiver');
@@ -290,7 +341,8 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   await expect(parent.getByLabel('Private invitation code')).toHaveValue(authoritativeInvitation);
   await parent.unroute('**/api/reset-invitation');
   await parent.getByRole('button', { name: 'Close dialog', exact: true }).click();
-  await parent.getByRole('button', { name: 'Room settings', exact: true }).click();
+  await parent.getByRole('link', { name: 'Settings', exact: true }).click();
+  await parent.getByRole('button', { name: 'Manage this device', exact: true }).click();
   await parent.getByRole('button', { name: 'Remove Bedroom', exact: true }).click();
   await expect(otherBaby.getByText('Access removed', { exact: true })).toBeVisible();
   await expect(otherBaby.getByRole('button', { name: 'Start monitoring' })).toBeDisabled();
@@ -334,12 +386,14 @@ test('first-run layout, keyboard dialog, invalid invite and denied microphone', 
   await page.getByRole('button', { name: 'Start monitoring' }).click();
   await expect(page.getByRole('alert')).toContainText('Microphone access is blocked');
   await expect(page.getByRole('button', { name: 'Start monitoring' })).toBeVisible();
-  await page.getByRole('button', { name: 'Room settings' }).click();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Manage this device', exact: true }).click();
   await page.getByRole('button', { name: 'Switch to parent device' }).click();
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Enable notifications' })).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/settings$/);
   await page.reload();
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page).toHaveURL(/\/app\/settings$/);
   await expect(page.getByRole('button', { name: 'Enable notifications' })).toBeVisible();
   const previous = await page.evaluate(() => JSON.parse(localStorage.getItem('pip-session')!));
   const invitationResponse = await page.request.post('/api/register', {
@@ -354,30 +408,69 @@ test('first-run layout, keyboard dialog, invalid invite and denied microphone', 
   await page.goto(`/#join=${invited.roomKey}`);
   let finishLeaving!: () => void;
   const leaving = new Promise<void>((resolve) => (finishLeaving = resolve));
-  await page.route('**/api/leave', async (route) => {
+  await page.route('**/api/deactivate', async (route) => {
     const response = await route.fetch();
     await leaving;
     await route.fulfill({ response });
   });
-  await page.getByRole('button', { name: 'Leave room and join' }).click();
-  await expect(page.getByRole('button', { name: 'Leaving room…' })).toBeVisible();
+  await page.getByRole('button', { name: 'Switch room and join' }).click();
+  await expect(page.getByRole('button', { name: 'Switching room…' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Open this invitation?' })).toBeVisible();
   finishLeaving();
   await expect(page.getByLabel('Invitation code')).toHaveValue(invited.roomKey);
-  await page.unroute('**/api/leave');
+  await page.unroute('**/api/deactivate');
   await page.getByLabel('Device name').fill('Caregiver');
   await page.getByRole('button', { name: 'Join room', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Caregiver handoff' })).toBeVisible();
   await expect(page.getByText('Connected', { exact: true })).toBeVisible();
-  const revoked = await page.request.post('/api/state', { data: previous });
-  expect(revoked.status()).toBe(401);
-  await page.getByRole('button', { name: 'Room settings' }).click();
+  const retained = await page.request.post('/api/state', { data: previous });
+  expect(retained.status()).toBe(200);
+  await page.getByRole('button', { name: 'Switch room', exact: true }).click();
+  await page.getByRole('button', { name: /Our little nest.*Permission test/ }).click();
+  await expect(page.getByRole('heading', { name: 'Our little nest' })).toBeVisible();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  const rename = page
+    .locator('form')
+    .filter({ has: page.getByLabel('Room name', { exact: true }) });
+  await rename.getByLabel('Room name', { exact: true }).fill('Evening nursery');
+  await rename.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Evening nursery' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Evening nursery' })).toBeVisible();
+  await page.getByRole('button', { name: 'Switch room', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: /Evening nursery.*Permission test/ }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: /Caregiver handoff.*Caregiver/ }).click();
+  await expect(page.getByRole('heading', { name: 'Caregiver handoff' })).toBeVisible();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Manage this device', exact: true }).click();
   await page.getByRole('button', { name: 'Leave this room' }).click();
   await expect(page.getByRole('button', { name: 'Create a room' })).toBeVisible();
   await page.getByRole('button', { name: 'Switch to dark mode' }).click();
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-
+  const manager = await (
+    await page.request.post('/api/register', {
+      data: { role: 'parent', name: 'Manager', roomKey: previous.roomKey },
+    })
+  ).json();
+  expect(
+    (
+      await page.request.post('/api/remove-device', {
+        data: { ...manager, target: previous.deviceId },
+      })
+    ).ok(),
+  ).toBe(true);
+  await page.getByRole('button', { name: 'Switch room', exact: true }).click();
+  await page.getByRole('button', { name: /Evening nursery.*Permission test/ }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('pip-session'))).toBeNull();
+  await page.getByRole('button', { name: 'Forget Evening nursery' }).click();
+  await expect(page.getByRole('button', { name: /Evening nursery.*Permission test/ })).toHaveCount(
+    0,
+  );
+  await page.request.post('/api/leave', { data: manager });
   await context.close();
 });

@@ -348,6 +348,40 @@ test(
         (await register({ name: 'After restart', role: 'parent', roomKey: latest.roomKey })).roomId,
         baby.roomId,
       );
+      assert.equal((await post('rename-room', { ...baby, name: 'Not allowed' })).status, 403);
+      assert.equal((await post('rename-room', { ...parent, name: '  ' })).status, 400);
+      assert.equal(
+        (await post('rename-device', { ...outsider, target: baby.deviceId, name: 'No' })).status,
+        403,
+      );
+      assert.equal(
+        (await post('rename-device', { ...baby, target: parent.deviceId, name: 'No' })).status,
+        403,
+      );
+      assert.equal((await post('rename-room', { ...parent, name: 'Evening room' })).status, 200);
+      assert.equal(
+        (await post('rename-device', { ...parent, target: baby.deviceId, name: 'Cot phone' }))
+          .status,
+        200,
+      );
+      const renamed = (await (await post('state', baby)).json()) as any;
+      assert.equal(renamed.roomName, 'Evening room');
+      assert.equal(renamed.devices.find((d: any) => d.id === baby.deviceId).name, 'Cot phone');
+      const activeParent = await connect(parent);
+      await eventually(async () => activeParent.messages.some((m) => m.type === 'ready'));
+      const subscription = { endpoint: 'https://fcm.googleapis.com/inactive', keys };
+      assert.equal((await post('subscription', { ...parent, subscription })).status, 200);
+      assert.equal((await post('deactivate', parent)).status, 200);
+      assert.equal((await post('state', parent)).status, 200);
+      assert.equal((await post('subscription', { ...parent, subscription })).status, 409);
+      assert.equal((await post('test-push', parent)).status, 400);
+      const reactivated = await connect(parent);
+      await eventually(async () => reactivated.messages.some((m) => m.type === 'ready'));
+      assert.equal((await post('subscription', { ...parent, subscription })).status, 200);
+      assert.equal((await post('deactivate', baby)).status, 200);
+      const inactive = (await (await post('state', parent)).json()) as any;
+      assert.equal(inactive.devices.find((d: any) => d.id === baby.deviceId).monitoring, false);
+      assert.equal(inactive.devices.find((d: any) => d.id === baby.deviceId).online, false);
       assert.equal((await post('leave', parent)).status, 200);
       assert.equal((await post('state', parent)).status, 401);
     } finally {

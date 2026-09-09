@@ -127,6 +127,39 @@ export class Room extends DurableObject<Env> {
       }
       const device = this.authenticate(body.deviceId, body.token);
       if (path === '/api/state') return json(this.state());
+      if (path === '/api/rename-room' || path === '/api/rename-device') {
+        if (path === '/api/rename-room') {
+          if (device.role !== 'parent')
+            throw new RequestError('Use a parent device to rename the room.', 403);
+          this.put('room', 'name', cleanName(body.name));
+        } else {
+          const target = this.get<Device>('device', body.target || device.id);
+          if (!target || (target.id !== device.id && device.role !== 'parent'))
+            throw new RequestError('You cannot rename that device.', 403);
+          target.name = cleanName(body.name);
+          this.put('device', target.id, target);
+        }
+        this.broadcast();
+        return json({ ok: true });
+      }
+      if (path === '/api/deactivate') {
+        this.ctx.storage.transactionSync(() => {
+          this.heartbeat(device, false, 0);
+          device.inactive = true;
+          device.lastSeen = 0;
+          device.offlineNotified = true;
+          device.subscription = undefined;
+          this.put('device', device.id, device);
+          this.remove('ice', device.id);
+          for (const job of this.all<Delivery>('delivery'))
+            if (job.deviceId === device.id) this.remove('delivery', job.id);
+        });
+        this.closeDevice(device.id, 4008, 'Room inactive');
+        await this.schedule();
+        this.broadcast();
+        return json({ ok: true });
+      }
+
       if (path === '/api/reset-invitation' || path === '/api/remove-device') {
         if (device.role !== 'parent')
           throw new RequestError('Use a parent device to manage access.', 403);
@@ -175,6 +208,8 @@ export class Room extends DurableObject<Env> {
 
       if (path === '/api/ice') return json(await this.ice(device.id));
       if (path === '/api/subscription') {
+        if (device.inactive)
+          throw new RequestError('Activate this room before enabling notifications.', 409);
         if (device.role !== 'parent' || !validSubscription(body.subscription))
           throw new RequestError('Invalid notification subscription.');
         device.subscription = body.subscription;
@@ -282,6 +317,7 @@ export class Room extends DurableObject<Env> {
     return {
       type: 'state',
       roomKey: this.get<string>('room', 'invitation'),
+      roomName: this.get<string>('room', 'name'),
       at: now,
       devices: this.all<Device>('device').map(
         ({ id, name, role, lastSeen, monitoring, level, lastNoise, sensitivity }) => ({
@@ -356,7 +392,10 @@ export class Room extends DurableObject<Env> {
         if (message.type !== 'hello') throw new RequestError('Authenticate first.');
         this.closeDevice(device.id, 4009, 'Device open in another tab', socket);
         session.deviceId = device.id;
-        this.ctx.storage.transactionSync(() => this.heartbeat(device, false, 0));
+        this.ctx.storage.transactionSync(() => {
+          device.inactive = false;
+          this.heartbeat(device, false, 0);
+        });
         this.send(socket, JSON.stringify({ type: 'ready' }));
       } else {
         this.ctx.storage.transactionSync(() => {

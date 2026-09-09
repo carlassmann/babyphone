@@ -22,6 +22,7 @@ export type Device = {
   lastSeen: number;
   monitoring: boolean;
   offlineNotified?: boolean;
+  inactive?: boolean;
   level: number;
   lastNoise: number;
   sensitivity?: number;

@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "babyphone",
+  "keep_vars": true,
   "main": "worker/index.ts",
   "compatibility_date": "2026-09-07",
   "compatibility_flags": ["nodejs_compat"],

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { request } from './connection';
 import type { Session } from './protocol';
 type InstallPrompt = Event & { prompt(): Promise<void>; userChoice: Promise<{ outcome: string }> };
@@ -10,6 +11,30 @@ export function usePwa() {
       Boolean((navigator as Navigator & { standalone?: boolean }).standalone),
   );
   const [error, setError] = useState('');
+  const [updateBlocked, setUpdateBlocked] = useState(false);
+  const blockedRef = useRef(false);
+  blockedRef.current = updateBlocked;
+  const update = useCallback(() => {
+    if (!waiting || blockedRef.current) return;
+    navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), {
+      once: true,
+    });
+    waiting.postMessage({ type: 'ACTIVATE' });
+  }, [waiting]);
+  useEffect(() => {
+    if (!waiting) return;
+    toast('Pip update available', {
+      id: 'pip-update',
+      duration: Infinity,
+      description: updateBlocked
+        ? 'Pause monitoring and listening before updating.'
+        : 'Reload to use the latest version.',
+      action: updateBlocked ? undefined : { label: 'Update', onClick: update },
+    });
+    return () => {
+      toast.dismiss('pip-update');
+    };
+  }, [waiting, updateBlocked, update]);
   useEffect(() => {
     const install = (event: Event) => {
       event.preventDefault();
@@ -21,21 +46,34 @@ export function usePwa() {
     };
     window.addEventListener('beforeinstallprompt', install);
     window.addEventListener('appinstalled', complete);
+    let registration: ServiceWorkerRegistration | undefined;
+    let cancelled = false;
+    const check = () => {
+      if (document.visibilityState === 'visible') void registration?.update().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('online', check);
     if ('serviceWorker' in navigator)
       void navigator.serviceWorker
         .register('/sw.js')
         .then((reg) => {
+          if (cancelled) return;
+          registration = reg;
           if (reg.waiting) setWaiting(reg.waiting);
           reg.addEventListener('updatefound', () => {
             const worker = reg.installing;
             worker?.addEventListener('statechange', () => {
-              if (worker.state === 'installed' && navigator.serviceWorker.controller)
+              if (!cancelled && worker.state === 'installed' && navigator.serviceWorker.controller)
                 setWaiting(worker);
             });
           });
+          check();
         })
         .catch(() => setError('Offline installation is unavailable. Reload while connected.'));
     return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('online', check);
       window.removeEventListener('beforeinstallprompt', install);
       window.removeEventListener('appinstalled', complete);
     };
@@ -51,12 +89,8 @@ export function usePwa() {
       if (choice?.outcome === 'accepted') setInstalled(true);
       setPrompt(undefined);
     },
-    update: () => {
-      navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), {
-        once: true,
-      });
-      waiting?.postMessage({ type: 'ACTIVATE' });
-    },
+    update,
+    setUpdateBlocked,
   };
 }
 export async function enableNotifications(session: Session) {

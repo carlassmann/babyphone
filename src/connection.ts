@@ -55,6 +55,11 @@ export class RoomConnection {
         this.stopped = true;
         return;
       }
+      if (event.code === 4008) {
+        this.onStatus('Room inactive');
+        this.stopped = true;
+        return;
+      }
       if (event.code === 4009) {
         this.onStatus('Open in another tab');
         this.stopped = true;
@@ -89,7 +94,12 @@ export class RoomConnection {
     this.stopped = true;
     clearTimeout(this.retry);
     clearInterval(this.ticker);
-    this.socket?.close();
+    if (this.socket) {
+      this.socket.onmessage = null;
+      this.socket.onclose = null;
+      this.socket.onerror = null;
+      this.socket.close();
+    }
   }
 }
 export class ApiError extends Error {

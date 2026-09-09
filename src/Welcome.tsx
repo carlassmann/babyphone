@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useLocation, useNavigate } from '@tanstack/react-router';
 import {
   ArrowLeft,
   ArrowRight,
@@ -7,7 +8,6 @@ import {
   Link,
   Mic,
   Moon,
-  ShieldCheck,
   Smartphone,
 } from 'lucide-react';
 import { request } from './connection';
@@ -20,16 +20,16 @@ export function Welcome({
   onJoin: (value: Session) => void;
   appMode?: boolean;
 }) {
-  const invited = new URLSearchParams(location.hash.slice(1)).get('join') || '';
-  const [mode, setMode] = useState(
-    invited
+  const route = useLocation();
+  const navigate = useNavigate();
+  const invited = new URLSearchParams(route.hash.replace(/^#/, '')).get('join') || '';
+  const legacySetup = new URLSearchParams(route.searchStr).get('setup');
+  const mode =
+    invited || route.pathname === '/app/join' || legacySetup === 'join'
       ? 'join'
-      : new URLSearchParams(location.search).get('setup') === 'create'
+      : route.pathname === '/app/create' || legacySetup === 'create'
         ? 'create'
-        : new URLSearchParams(location.search).get('setup') === 'join'
-          ? 'join'
-          : '',
-  );
+        : '';
   const [role, setRole] = useState<Role>('parent');
   const [name, setName] = useState('');
   const [roomKey, setRoomKey] = useState(invited);
@@ -46,7 +46,6 @@ export function Welcome({
         role,
         ...(mode === 'join' ? { roomKey } : { roomName }),
       });
-      history.replaceState(null, '', '/');
       onJoin(session);
     } catch (error) {
       setError(message(error));
@@ -58,9 +57,6 @@ export function Welcome({
     <main className={appMode ? 'welcome app-onboarding' : 'welcome'}>
       {!appMode && (
         <section className="welcome-art">
-          <div className="eyebrow">
-            <span /> A LITTLE PEACE OF MIND
-          </div>
           <h1>
             Close by.
             <br />
@@ -74,9 +70,6 @@ export function Welcome({
               src="/pip-sleeping.png"
               alt="A little yellow bird sleeping on a blue crescent cushion"
             />
-          </div>
-          <div className="art-note">
-            <ShieldCheck size={16} /> No recordings. Just a little reassurance.
           </div>
         </section>
       )}
@@ -101,16 +94,10 @@ export function Welcome({
               with you.
             </p>
             <div className="welcome-actions">
-              <button
-                className="primary"
-                onClick={() => (appMode ? setMode('create') : location.assign('/app?setup=create'))}
-              >
+              <button className="primary" onClick={() => void navigate({ to: '/app/create' })}>
                 Create a room <ArrowRight size={18} />
               </button>
-              <button
-                className="secondary"
-                onClick={() => (appMode ? setMode('join') : location.assign('/app?setup=join'))}
-              >
+              <button className="secondary" onClick={() => void navigate({ to: '/app/join' })}>
                 Join a room <Link size={18} />
               </button>
             </div>
@@ -136,14 +123,17 @@ export function Welcome({
                 </span>
               </div>
             )}
-            <p className="caption">No account. No camera. Nothing complicated.</p>
           </>
         ) : (
           <form onSubmit={submit} className="setup">
-            <button type="button" className="back quiet" onClick={() => setMode('')}>
+            <button
+              type="button"
+              className="back quiet"
+              onClick={() => void navigate({ to: '/app', hash: '', search: {} })}
+            >
               <ArrowLeft size={16} /> Back
             </button>
-            <h2>{mode === 'join' ? 'Come on in.' : 'Make a little nest.'}</h2>
+            <h2>{mode === 'join' ? 'Join a room' : 'Create a room'}</h2>
             <p>
               {mode === 'join'
                 ? 'Use the invitation from your other device.'

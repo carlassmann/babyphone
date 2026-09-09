@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Link as RouteLink, Outlet } from '@tanstack/react-router';
 import {
   ArrowRight,
   AudioLines,
@@ -13,7 +14,6 @@ import {
   Pause,
   Plus,
   Settings,
-  ShieldCheck,
   Smartphone,
   Sun,
   Wifi,
@@ -30,10 +30,16 @@ export function Room({
   session,
   save,
   pwa,
+  preferences,
+  roomSwitcher,
+  updateSession,
 }: {
   session: Session;
   save: (value: Session | null) => void;
   pwa: ReturnType<typeof usePwa>;
+  preferences: ReactNode;
+  roomSwitcher: ReactNode;
+  updateSession: (session: Session) => void;
 }) {
   const [devices, setDevices] = useState<PublicDevice[]>([]);
   const [events, setEvents] = useState<Alert[]>([]);
@@ -54,7 +60,10 @@ export function Room({
   const [dismissedEvent, setDismissedEvent] = useState('');
   const [sensitivity, setSensitivity] = useState(2);
   const [dim, setDim] = useState(() => localStorage.getItem('pip-dim') === 'true');
-  const [view, setView] = useState('monitor');
+  useEffect(() => {
+    pwa.setUpdateBlocked(active || listeningTo);
+    return () => pwa.setUpdateBlocked(false);
+  }, [active, listeningTo, pwa.setUpdateBlocked]);
   const connectionRef = useRef<RoomConnection>(null);
   const babyRef = useRef<BabyAudio>(null);
   const callsRef = useRef<AudioCalls>(null);
@@ -147,6 +156,12 @@ export function Room({
           setEvents(data.events);
           const own = data.devices.find((device) => device.id === session.deviceId);
           if (own) {
+            updateSession({
+              ...session,
+              name: own.name,
+              roomName: data.roomName || session.roomName,
+              roomKey: data.roomKey || session.roomKey,
+            });
             setSensitivity(own.sensitivity);
             baby.threshold = [0.16, 0.08, 0.035][own.sensitivity - 1]!;
           }
@@ -163,7 +178,11 @@ export function Room({
       (status) => {
         setConnection(status);
         if (status !== 'Connected') calls.stop();
-        if (status === 'Open in another tab' || status === 'Access removed') {
+        if (
+          status === 'Open in another tab' ||
+          status === 'Access removed' ||
+          status === 'Room inactive'
+        ) {
           baby.stop();
           stateRef.current.monitoring = false;
           setActive(false);
@@ -171,15 +190,6 @@ export function Room({
       },
       () => stateRef.current,
     ));
-    void navigator.serviceWorker?.ready
-      .then(async (reg) => {
-        const sub = await reg.pushManager?.getSubscription();
-        if (sub && !isBaby) {
-          await request('subscription', { ...session, subscription: sub.toJSON() });
-          setPush(true);
-        }
-      })
-      .catch(() => setPush(false));
     const pageHide = () => {
       baby.stop();
       calls.stop();
@@ -194,7 +204,24 @@ export function Room({
       room.close();
       window.removeEventListener('pagehide', pageHide);
     };
-  }, [session, isBaby]);
+  }, [session.deviceId, isBaby, updateSession]);
+  useEffect(() => {
+    if (!connected || isBaby) return;
+    let cancelled = false;
+    void navigator.serviceWorker?.ready
+      .then(async (reg) => {
+        const sub = await reg.pushManager?.getSubscription();
+        if (cancelled || !sub) return;
+        await request('subscription', { ...session, subscription: sub.toJSON() });
+        if (!cancelled) setPush(true);
+      })
+      .catch(() => {
+        if (!cancelled) setPush(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connected, isBaby, session.deviceId]);
   async function toggleMonitoring() {
     setError('');
     if (active) {
@@ -288,11 +315,25 @@ export function Room({
   return (
     <main className="room">
       <div ref={audioRef} hidden />
-      <div className="room-heading">
-        <div>
-          <div className="eyebrow">{isBaby ? 'BABY DEVICE' : 'PARENT DEVICE'}</div>
-          <h1>{session.roomName}</h1>
-        </div>
+      <header className="room-header">
+        <RouteLink to="/app" className="room-brand" aria-label="Pip home">
+          <img src="/icon.svg" alt="" />
+        </RouteLink>
+        <h1 aria-label={session.roomName}>{roomSwitcher}</h1>
+        <nav className="room-navigation" aria-label="Room navigation">
+          {(
+            [
+              ['/app', 'Monitor', Headphones],
+              ['/app/activity', 'Activity', AudioLines],
+              ['/app/settings', 'Settings', Settings],
+            ] as const
+          ).map(([to, label, Icon]) => (
+            <RouteLink key={to} to={to} activeOptions={{ exact: true }}>
+              <Icon size={19} />
+              <span>{label}</span>
+            </RouteLink>
+          ))}
+        </nav>
         <div className="room-tools">
           <button
             className="icon-button"
@@ -302,34 +343,32 @@ export function Room({
           >
             {dim ? <Sun size={19} /> : <Moon size={19} />}
           </button>
-          <button className="secondary small" onClick={() => setModal('invite')}>
-            <Plus size={17} /> Invite device
-          </button>
           <button
-            className="icon-button"
-            aria-label="Room settings"
-            onClick={() => setModal('settings')}
+            className="secondary small"
+            aria-label="Invite device"
+            onClick={() => setModal('invite')}
           >
-            <Settings size={20} />
+            <Plus size={17} />
+            <span>Invite device</span>
           </button>
         </div>
-      </div>
-      <div className="room-status">
+      </header>
+      <div className="connection-summary">
         <span className={`status ${connected ? 'green' : 'amber'}`}>
           <i />
           {connection}
         </span>
-        <span>
-          <Smartphone size={14} />
-          {session.name} · {isBaby ? 'Baby device' : 'Parent device'}
-        </span>
+        <span>{session.name}</span>
+        {!isBaby && parentAwake && (
+          <span className="wake-status">
+            <Sun size={15} />
+            Screen staying awake
+          </span>
+        )}
       </div>
-      {!isBaby && (
-        <p className={parentAwake ? 'caption parent-wake' : 'notice'}>
-          <Sun size={15} />{' '}
-          {parentAwake
-            ? 'Screen staying awake'
-            : 'Screen wake lock unavailable. Keep this screen awake manually while listening.'}
+      {!isBaby && !parentAwake && (
+        <p className="notice">
+          Screen wake lock unavailable. Keep this screen awake manually while listening.
         </p>
       )}
       {!connected && (
@@ -381,366 +420,335 @@ export function Room({
           </button>
         </div>
       )}
-      <nav className="app-navigation" aria-label="Room navigation">
-        {(
-          [
-            ['monitor', 'Monitor', Headphones],
-            ['activity', 'Activity', AudioLines],
-            ['settings', 'Settings', Settings],
-          ] as const
-        ).map(([id, label, Icon]) => (
-          <button
-            key={id as string}
-            aria-current={view === id ? 'page' : undefined}
-            onClick={() => setView(id as string)}
-          >
-            <Icon size={19} />
-            {label as string}
-          </button>
-        ))}
-      </nav>
-      <div className={`room-grid view-${view}`}>
-        <section className="monitor-panel" hidden={view !== 'monitor'}>
-          {isBaby ? (
-            <>
-              <div className="panel-top">
-                <span className="eyebrow">BABY’S SIDE</span>
-              </div>
-              <div className="monitor-hero">
-                <img src="/pip-sleeping.png" alt="Pip sleeping" />
-                <span className={`status ${active && connected ? 'green' : ''}`}>
-                  <i />
-                  {active
-                    ? connected
-                      ? 'Monitoring'
-                      : 'Monitoring locally only'
-                    : 'Ready when you are'}
-                </span>
-                <h2>{active ? 'Monitoring sound' : 'Ready to monitor'}</h2>
-                <p>
-                  {active
-                    ? 'Listening for sustained sounds in this room.'
-                    : 'Place this device near your baby, out of reach.'}
-                </p>
-              </div>
-              <div className="meter-wrap">
-                <div>
-                  <span>Room sound</span>
-                  <span>
-                    {active ? (level > 0.08 ? 'A little sound' : 'Quiet') : 'Microphone off'}
-                  </span>
-                </div>
-                <Meter value={active ? level : 0} />
-              </div>
-              <button
-                className={`primary full ${active ? 'stop' : ''}`}
-                disabled={busy || (!active && !connected)}
-                onClick={() => void toggleMonitoring()}
-              >
-                {active ? <Pause size={19} /> : <Mic size={19} />}{' '}
-                {busy ? 'Opening microphone…' : active ? 'Pause monitoring' : 'Start monitoring'}
-              </button>
-              <div className="baby-checks">
-                <span>
-                  <Mic size={15} />
-                  {active ? 'Microphone on' : 'Microphone off'}
-                </span>
-                <span>
-                  <Sun size={15} />
-                  {awake ? 'Screen staying awake' : 'Screen wake lock off'}
-                </span>
-                <span>
-                  <Headphones size={15} />
-                  {parents.length} parent {parents.length === 1 ? 'device' : 'devices'} online
-                </span>
-              </div>
-              {active && !awake && (
-                <p className="notice">
-                  Keep the screen awake manually. Automatic screen wake lock is unavailable.
-                </p>
-              )}
-              <div className="sensitivity">
-                <label htmlFor="sensitivity">
-                  Sound sensitivity <span>{['Low', 'Medium', 'High'][sensitivity - 1]}</span>
-                </label>
-                <input
-                  id="sensitivity"
-                  type="range"
-                  min="1"
-                  max="3"
-                  step="1"
-                  value={sensitivity}
-                  onChange={(e) => void changeSensitivity(session.deviceId, Number(e.target.value))}
-                />
-                <p className="caption">
-                  Alerts after 1.5 seconds of sound, with 20 seconds between alerts.
-                </p>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="panel-top">
-                <span className="eyebrow">LIVE MONITOR</span>
-                <span className="caption">
-                  {babies.length} baby {babies.length === 1 ? 'device' : 'devices'}
-                </span>
-              </div>
-              {babies.length === 0 ? (
-                <div className="empty-nest">
-                  <img src="/pip-sleeping.png" alt="Pip waiting for a baby device" />
-                  <h2>
-                    A room for two.
-                    <br />
-                    Or a few.
-                  </h2>
-                  <p>
-                    Add a device to stay with your baby.
-                    <br />
-                    Their little sounds will show up here.
-                  </p>
-                  <button className="primary" onClick={() => setModal('invite')}>
-                    Invite a baby device <ArrowRight size={18} />
-                  </button>
-                </div>
-              ) : (
+      <RoomViews.Provider
+        value={{
+          monitor: (
+            <section className="monitor-panel">
+              {isBaby ? (
                 <>
-                  <div className="parent-intro">
-                    <h2>
-                      {babies.some((d) => d.monitoring) && connected
-                        ? 'Baby monitors'
-                        : 'Baby monitors'}
-                    </h2>
+                  <div className="monitor-hero">
+                    <img src="/pip-sleeping.png" alt="Pip sleeping" />
+                    <span className={`status ${active && connected ? 'green' : ''}`}>
+                      <i />
+                      {active
+                        ? connected
+                          ? 'Monitoring'
+                          : 'Monitoring locally only'
+                        : 'Ready when you are'}
+                    </span>
+                    <h2>{active ? 'Monitoring sound' : 'Ready to monitor'}</h2>
                     <p>
-                      {babies.some((d) => d.monitoring) && connected
-                        ? 'Tap Listen for a live moment from their room.'
-                        : 'Start monitoring on your baby device.'}
+                      {active
+                        ? 'Listening for sustained sounds in this room.'
+                        : 'Place this device near your baby, out of reach.'}
                     </p>
                   </div>
-                  <div className="device-list">
-                    {babies.map((device) => (
-                      <article className="device-card" key={device.id}>
-                        <div className="device-heading">
-                          <div className="device-icon">
-                            <Moon size={25} />
-                          </div>
-                          <div>
-                            <h3>{device.name}</h3>
-                            <span
-                              className={`status ${device.monitoring && connected ? 'green' : 'amber'}`}
-                            >
-                              <i />
-                              {!connected
-                                ? 'Connection unknown'
-                                : !device.online
-                                  ? 'Offline · check device'
-                                  : device.monitoring
-                                    ? 'Monitoring'
-                                    : 'Monitoring paused'}
-                            </span>
-                          </div>
-                        </div>
-                        <Meter value={device.monitoring && connected ? device.level : 0} />
-                        <div className="sensitivity">
-                          <label htmlFor={'sensitivity-' + device.id}>
-                            Sound sensitivity{' '}
-                            <span>{['Low', 'Medium', 'High'][device.sensitivity - 1]}</span>
-                          </label>
-                          <input
-                            id={'sensitivity-' + device.id}
-                            aria-label={device.name + ' sound sensitivity'}
-                            type="range"
-                            min="1"
-                            max="3"
-                            step="1"
-                            disabled={!connected}
-                            value={device.sensitivity}
-                            onChange={(event) =>
-                              void changeSensitivity(device.id, Number(event.target.value))
-                            }
-                          />
-                        </div>
-                        <div className="device-bottom">
-                          <span className="caption">
-                            {device.lastNoise
-                              ? `Last sound ${relative(device.lastNoise)}`
-                              : 'No sounds detected yet'}
-                          </span>
-                          {audioStatuses[device.id] &&
-                          [
-                            'Listening live',
-                            'Connecting audio',
-                            'Tap Resume audio to hear your baby.',
-                          ].includes(audioStatuses[device.id] || '') ? (
-                            <button
-                              className="secondary small"
-                              onClick={() => callsRef.current?.stop(device.id)}
-                            >
-                              <Pause size={16} /> Stop listening
-                            </button>
-                          ) : (
-                            <button
-                              className="primary small"
-                              disabled={!connected || !device.monitoring}
-                              onClick={() =>
-                                void callsRef.current?.listen(device.id).catch((error) => {
-                                  callsRef.current?.stop(device.id);
-                                  setError(message(error));
-                                })
-                              }
-                            >
-                              <Headphones size={17} /> Listen
-                            </button>
-                          )}
-                        </div>
-                        {audioStatuses[device.id] && (
-                          <div className="audio-status" role="status">
-                            <AudioLines size={16} />
-                            {audioStatuses[device.id]}
-                            {audioStatuses[device.id]?.includes('Resume') && (
-                              <button
-                                onClick={() =>
-                                  void callsRef.current
-                                    ?.resume(device.id)
-                                    .catch((error) => setError(message(error)))
-                                }
-                              >
-                                Resume audio
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </article>
-                    ))}
+                  <div className="meter-wrap">
+                    <div>
+                      <span>Room sound</span>
+                      <span>
+                        {active ? (level > 0.08 ? 'A little sound' : 'Quiet') : 'Microphone off'}
+                      </span>
+                    </div>
+                    <Meter value={active ? level : 0} />
+                  </div>
+                  <button
+                    className={`primary full ${active ? 'stop' : ''}`}
+                    disabled={busy || (!active && !connected)}
+                    onClick={() => void toggleMonitoring()}
+                  >
+                    {active ? <Pause size={19} /> : <Mic size={19} />}{' '}
+                    {busy
+                      ? 'Opening microphone…'
+                      : active
+                        ? 'Pause monitoring'
+                        : 'Start monitoring'}
+                  </button>
+                  <div className="baby-checks">
+                    <span>
+                      <Mic size={15} />
+                      {active ? 'Microphone on' : 'Microphone off'}
+                    </span>
+                    <span>
+                      <Sun size={15} />
+                      {awake ? 'Screen staying awake' : 'Screen wake lock off'}
+                    </span>
+                    <span>
+                      <Headphones size={15} />
+                      {parents.length} parent {parents.length === 1 ? 'device' : 'devices'} online
+                    </span>
+                  </div>
+                  {active && !awake && (
+                    <p className="notice">
+                      Keep the screen awake manually. Automatic screen wake lock is unavailable.
+                    </p>
+                  )}
+                  <div className="sensitivity">
+                    <label htmlFor="sensitivity">
+                      Sound sensitivity <span>{['Low', 'Medium', 'High'][sensitivity - 1]}</span>
+                    </label>
+                    <input
+                      id="sensitivity"
+                      type="range"
+                      min="1"
+                      max="3"
+                      step="1"
+                      value={sensitivity}
+                      onChange={(e) =>
+                        void changeSensitivity(session.deviceId, Number(e.target.value))
+                      }
+                    />
+                    <p className="caption">
+                      Alerts after 1.5 seconds of sound, with 20 seconds between alerts.
+                    </p>
                   </div>
                 </>
+              ) : (
+                <>
+                  {babies.length === 0 ? (
+                    <div className="empty-nest">
+                      <img src="/pip-sleeping.png" alt="Pip waiting for a baby device" />
+                      <h2>Add your baby device</h2>
+                      <p>
+                        Add a device to stay with your baby.
+                        <br />
+                        Open the invitation on the phone that stays in the nursery.
+                      </p>
+                      <button className="primary" onClick={() => setModal('invite')}>
+                        Invite a baby device <ArrowRight size={18} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="device-list">
+                        {babies.map((device) => (
+                          <article className="device-card" key={device.id}>
+                            <div className="device-heading">
+                              <div className="device-icon">
+                                <Moon size={25} />
+                              </div>
+                              <div>
+                                <h3>{device.name}</h3>
+                                <span
+                                  className={`status ${device.monitoring && connected ? 'green' : 'amber'}`}
+                                >
+                                  <i />
+                                  {!connected
+                                    ? 'Connection unknown'
+                                    : !device.online
+                                      ? 'Offline · check device'
+                                      : device.monitoring
+                                        ? 'Monitoring'
+                                        : 'Monitoring paused'}
+                                </span>
+                              </div>
+                            </div>
+                            <Meter value={device.monitoring && connected ? device.level : 0} />
+                            <div className="sensitivity">
+                              <label htmlFor={'sensitivity-' + device.id}>
+                                Sound sensitivity{' '}
+                                <span>{['Low', 'Medium', 'High'][device.sensitivity - 1]}</span>
+                              </label>
+                              <input
+                                id={'sensitivity-' + device.id}
+                                aria-label={device.name + ' sound sensitivity'}
+                                type="range"
+                                min="1"
+                                max="3"
+                                step="1"
+                                disabled={!connected}
+                                value={device.sensitivity}
+                                onChange={(event) =>
+                                  void changeSensitivity(device.id, Number(event.target.value))
+                                }
+                              />
+                            </div>
+                            <div className="device-bottom">
+                              <span className="caption">
+                                {device.lastNoise
+                                  ? `Last sound ${relative(device.lastNoise)}`
+                                  : 'No sounds detected yet'}
+                              </span>
+                              {audioStatuses[device.id] &&
+                              [
+                                'Listening live',
+                                'Connecting audio',
+                                'Tap Resume audio to hear your baby.',
+                              ].includes(audioStatuses[device.id] || '') ? (
+                                <button
+                                  className="secondary small"
+                                  onClick={() => callsRef.current?.stop(device.id)}
+                                >
+                                  <Pause size={16} /> Stop listening
+                                </button>
+                              ) : (
+                                <button
+                                  className="primary small"
+                                  disabled={!connected || !device.monitoring}
+                                  onClick={() =>
+                                    void callsRef.current?.listen(device.id).catch((error) => {
+                                      callsRef.current?.stop(device.id);
+                                      setError(message(error));
+                                    })
+                                  }
+                                >
+                                  <Headphones size={17} /> Listen
+                                </button>
+                              )}
+                            </div>
+                            {audioStatuses[device.id] && (
+                              <div className="audio-status" role="status">
+                                <AudioLines size={16} />
+                                {audioStatuses[device.id]}
+                                {audioStatuses[device.id]?.includes('Resume') && (
+                                  <button
+                                    onClick={() =>
+                                      void callsRef.current
+                                        ?.resume(device.id)
+                                        .catch((error) => setError(message(error)))
+                                    }
+                                  >
+                                    Resume audio
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </article>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
               )}
-              <div className="privacy-line">
-                <ShieldCheck size={16} /> Live audio is private. Nothing is recorded.
-              </div>
-            </>
-          )}
-        </section>
-        <aside>
-          <section className="side-card connection-card" hidden={view !== 'settings'}>
-            <div className="section-icon">
-              <Bell size={21} />
-            </div>
-            <h3>{isBaby ? 'Device setup' : 'Notifications'}</h3>
-            {isBaby ? (
-              <>
-                <p>Keep this device plugged in, with Pip open in the foreground.</p>
-                <div className="check-row">
-                  <Check size={16} /> Volume is analyzed here
-                </div>
-                <div className="check-row">
-                  <Check size={16} /> No audio is saved
-                </div>
-                <div className="check-row">
-                  <Check size={16} /> Parents can listen anytime
-                </div>
-              </>
-            ) : (
-              <>
-                <p>
-                  Get a notification for sustained noise or a disconnected baby device, even when
-                  Pip is in the background.
-                </p>
-                <button
-                  className={push ? 'secondary full small' : 'primary full small'}
-                  disabled={busy || push || !connected}
-                  onClick={() => void notify()}
-                >
-                  {push ? <Check size={16} /> : <Bell size={16} />}{' '}
-                  {push ? 'Notifications enabled' : 'Enable notifications'}
-                </button>
-                {push && (
-                  <button
-                    className="quiet full small"
-                    disabled={busy}
-                    onClick={() => void testNotification()}
-                  >
-                    Test notification <ArrowRight size={15} />
+            </section>
+          ),
+          activity: (
+            <section className="side-card activity">
+              <div className="section-heading">
+                <h3>Activity</h3>
+                <span className="caption">Last 24 hours</span>
+                {!isBaby && events.length > 0 && (
+                  <button className="quiet small" onClick={() => void clearEvents()}>
+                    Clear activity
                   </button>
                 )}
-                {pushTest && (
-                  <p className="caption" role="status">
-                    {pushTest}
-                  </p>
-                )}
-                <p className="caption">
-                  Allow notifications in your device settings too. On iPhone, install Pip first.
-                  Notifications can be delayed by your device or network.
-                </p>
-              </>
-            )}
-          </section>
-          <section className="side-card activity" hidden={view !== 'activity'}>
-            <div className="section-heading">
-              <h3>Activity</h3>
-              <span className="caption">Last 24 hours</span>
-              {!isBaby && events.length > 0 && (
-                <button className="quiet small" onClick={() => void clearEvents()}>
-                  Clear activity
-                </button>
-              )}
-            </div>
-            {events.length ? (
-              <div className="event-list">
-                {events.map((event) => (
-                  <div className="event" key={event.id}>
-                    <span className={`event-icon ${event.kind !== 'noise' ? 'warning' : ''}`}>
-                      {event.kind === 'noise' ? <AudioLines size={16} /> : <Wifi size={16} />}
-                    </span>
-                    <div>
-                      <strong>
-                        {event.kind === 'noise'
-                          ? 'A little sound'
-                          : event.kind === 'paused'
-                            ? 'Monitoring paused'
-                            : 'Device disconnected'}
-                      </strong>
-                      <span>{event.name}</span>
+              </div>
+              {events.length ? (
+                <div className="event-list">
+                  {events.map((event) => (
+                    <div className="event" key={event.id}>
+                      <span className={`event-icon ${event.kind !== 'noise' ? 'warning' : ''}`}>
+                        {event.kind === 'noise' ? <AudioLines size={16} /> : <Wifi size={16} />}
+                      </span>
+                      <div>
+                        <strong>
+                          {event.kind === 'noise'
+                            ? 'A little sound'
+                            : event.kind === 'paused'
+                              ? 'Monitoring paused'
+                              : 'Device disconnected'}
+                        </strong>
+                        <span>{event.name}</span>
+                      </div>
+                      <time>
+                        {new Date(event.at).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </time>
                     </div>
-                    <time>
-                      {new Date(event.at).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </time>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-events">
-                <span>﹏</span>
-                <p>
-                  No activity yet.
-                  <br />
-                  Sound and connection events appear here.
-                </p>
-              </div>
-            )}
-          </section>
-          <p className="prototype-note" hidden={view !== 'settings'}>
-            An extra pair of ears, not a replacement for checking on your baby.
-          </p>
-          {view === 'settings' && (
-            <button className="secondary full" onClick={() => setModal('settings')}>
-              <Smartphone size={18} /> Manage this device
-            </button>
-          )}
-          {pwa.waiting && (
-            <button
-              className="secondary full small"
-              disabled={active || !!listeningTo}
-              onClick={pwa.update}
-            >
-              Update ready{active || listeningTo ? ' · pause first' : ' · reload Pip'}
-            </button>
-          )}
-          {pwa.error && <p className="notice">{pwa.error}</p>}
-        </aside>
-      </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-events">
+                  <p>
+                    No activity yet.
+                    <br />
+                    Sound and connection events appear here.
+                  </p>
+                </div>
+              )}
+            </section>
+          ),
+          settings: (
+            <>
+              {!isBaby && (
+                <section className="side-card">
+                  <h3>Room</h3>
+                  <RenameField
+                    label="Room name"
+                    value={session.roomName}
+                    save={(name) => request('rename-room', { ...session, name })}
+                  />
+                </section>
+              )}
+              <section className="side-card connection-card">
+                <div className="section-icon">
+                  <Bell size={21} />
+                </div>
+                <h3>{isBaby ? 'Device setup' : 'Notifications'}</h3>
+                {isBaby ? (
+                  <>
+                    <p>Keep this device plugged in, with Pip open in the foreground.</p>
+                    <div className="check-row">
+                      <Check size={16} /> Volume is analyzed here
+                    </div>
+                    <div className="check-row">
+                      <Check size={16} /> No audio is saved
+                    </div>
+                    <div className="check-row">
+                      <Check size={16} /> Parents can listen anytime
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      Get a notification for sustained noise or a disconnected baby device, even
+                      when Pip is in the background.
+                    </p>
+                    <button
+                      className={push ? 'secondary full small' : 'primary full small'}
+                      disabled={busy || push || !connected}
+                      onClick={() => void notify()}
+                    >
+                      {push ? <Check size={16} /> : <Bell size={16} />}{' '}
+                      {push ? 'Notifications enabled' : 'Enable notifications'}
+                    </button>
+                    {push && (
+                      <button
+                        className="quiet full small"
+                        disabled={busy}
+                        onClick={() => void testNotification()}
+                      >
+                        Test notification <ArrowRight size={15} />
+                      </button>
+                    )}
+                    {pushTest && (
+                      <p className="caption" role="status">
+                        {pushTest}
+                      </p>
+                    )}
+                    <p className="caption">
+                      Allow notifications in your device settings too. On iPhone, install Pip first.
+                      Notifications can be delayed by your device or network.
+                    </p>
+                  </>
+                )}
+              </section>
+
+              <button className="secondary full" onClick={() => setModal('settings')}>
+                <Smartphone size={18} /> Manage this device
+              </button>
+              {preferences}
+            </>
+          ),
+        }}
+      >
+        <div className="room-grid">
+          <Outlet />
+        </div>
+      </RoomViews.Provider>
+      {pwa.error && <p className="notice">{pwa.error}</p>}
       {modal && (
         <Modal
           title={modal === 'invite' ? 'Invite a device' : 'Device settings'}
@@ -759,7 +767,9 @@ export function Room({
               <div className="invite-actions">
                 <button
                   className="primary full"
-                  onClick={() => void copy(`${location.origin}/#join=${invitation}`, 'link')}
+                  onClick={() =>
+                    void copy(`${location.origin}/app/join#join=${invitation}`, 'link')
+                  }
                 >
                   {copied === 'link' ? <Check size={17} /> : <Link size={17} />}{' '}
                   {copied === 'link' ? 'Link copied' : 'Copy invite link'}
@@ -794,6 +804,11 @@ export function Room({
                   <p>{isBaby ? 'Baby device' : 'Parent device'}</p>
                 </div>
               </div>
+              <RenameField
+                label="Device name"
+                value={session.name}
+                save={(name) => request('rename-device', { ...session, name })}
+              />
               <button className="secondary full" disabled={busy} onClick={() => void changeRole()}>
                 Switch to {isBaby ? 'parent' : 'baby'} device
                 <ChevronRight size={17} />
@@ -812,7 +827,13 @@ export function Room({
                     .map((device) => (
                       <div className="setting-detail" key={device.id}>
                         <div>
-                          <strong>{device.name}</strong>
+                          <RenameField
+                            label={'Name for ' + device.name}
+                            value={device.name}
+                            save={(name) =>
+                              request('rename-device', { ...session, name, target: device.id })
+                            }
+                          />
                           <p>
                             {device.role === 'baby' ? 'Baby' : 'Parent'} ·{' '}
                             {device.online ? 'Online' : 'Offline'}
@@ -865,5 +886,73 @@ function Meter({ value }: { value: number }) {
         />
       ))}
     </div>
+  );
+}
+
+const RoomViews = createContext<Record<'monitor' | 'activity' | 'settings', ReactNode> | null>(
+  null,
+);
+function useRoomView(view: 'monitor' | 'activity' | 'settings') {
+  const views = useContext(RoomViews);
+  if (!views) throw new Error('Join a room before opening its pages');
+  return views[view];
+}
+export function MonitorPage() {
+  return useRoomView('monitor');
+}
+export function ActivityPage() {
+  return useRoomView('activity');
+}
+export function SettingsPage() {
+  return useRoomView('settings');
+}
+
+function RenameField({
+  label,
+  value,
+  save,
+}: {
+  label: string;
+  value: string;
+  save: (name: string) => Promise<unknown>;
+}) {
+  const [name, setName] = useState(value);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => setName(value), [value]);
+  return (
+    <form
+      className="rename-field"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        setBusy(true);
+        setError('');
+        try {
+          await save(name.trim());
+        } catch (error) {
+          setError(message(error));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label>
+        {label}
+        <input
+          required
+          maxLength={40}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+      </label>
+      <button className="secondary small" disabled={busy || !name.trim() || name.trim() === value}>
+        Save
+      </button>
+      {error && (
+        <p role="alert" className="notice">
+          {error}
+        </p>
+      )}
+    </form>
   );
 }

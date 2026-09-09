@@ -1,6 +1,6 @@
 # Pip
 
-A private audio baby monitor PWA. React, TypeScript, and Bun tooling. Cloudflare Workers hosts the app and API. Each room has a SQLite-backed Durable Object for devices, WebSocket signaling, events, and notification retries. Live audio uses WebRTC with Cloudflare Realtime TURN as fallback.
+A private audio baby monitor PWA. React, TanStack Router, TypeScript, and Bun tooling. Cloudflare Workers hosts the app and API. Each room has a SQLite-backed Durable Object for devices, WebSocket signaling, events, and notification retries. Live audio uses WebRTC with Cloudflare Realtime TURN as fallback.
 
 No Jazz, Vercel, or separate database account is required. No audio is recorded or stored. Browser push delivery still goes through Apple, Google, or Mozilla's push services as required by the browser.
 
@@ -86,13 +86,21 @@ Without TURN secrets, local audio attempts direct WebRTC using Cloudflare STUN. 
 
 ## Invite a caregiver or remove access
 
-From any parent device, choose **Invite device → Copy invite link**. The caregiver opens it, chooses **Me**, names their device, and joins. They can listen live and enable notifications. Invitations do not expire automatically. If their device already belongs to another room, Pip asks whether to leave it before opening the invitation.
+From any parent device, choose **Invite device → Copy invite link**. The caregiver opens it, chooses **Me**, names their device, and joins. They can listen live and enable notifications. Invitations do not expire automatically. If their device already belongs to another room, Pip asks whether to switch rooms before opening the invitation. The previous membership stays saved.
 
-To remove access, open **Room settings → Room access → Remove** beside the device. This revokes that device's session, disconnects its live audio, removes its push subscription and queued notifications, and resets the room invitation. Old links stop working. Existing room members stay connected and can copy the new invitation. A notification already accepted by a push provider may still arrive.
+To remove access, open **Settings → Manage this device → Room access → Remove** beside the device. This revokes that device's session, disconnects its live audio, removes its push subscription and queued notifications, and resets the room invitation. Old links stop working. Existing room members stay connected and can copy the new invitation. A notification already accepted by a push provider may still arrive.
 
 **Invite device → Reset invitation link** invalidates old links without removing existing members. Leaving voluntarily removes only that device; it does not reset the invitation.
 
 Every parent has these controls. Pip has no owner or restricted guest role. If someone joined on multiple devices, remove each device. They can regain access only through a fresh invitation shared by a remaining room member.
+
+## Manage and switch rooms
+
+Tap the room name to open **Your rooms**. Create or join another room, then select a saved room to activate it. Memberships stay saved in this browser across reloads; existing installations keep their current room automatically.
+
+Only the active room monitors or sends notifications to this device. Switching stops live audio and baby monitoring, removes the previous room’s push subscription and pending notifications, and preserves access for later. Switching requires a server connection. Start monitoring or listening again after switching back. Notifications already accepted by a push provider may still arrive.
+
+Parents can rename the room under **Settings → Room**. **Settings → Manage this device** contains device names and participant removal. Names sync to connected devices. **Leave room** revokes your membership; **Forget** only removes an inactive room from this browser’s saved list.
 
 ## Reliability and privacy
 
@@ -125,3 +133,9 @@ bun run test:e2e
 The Workers test exercises real workerd and SQLite persistence with mocked external TURN and push services. Browser tests use synthetic microphones in Chromium and WebKit. See `TESTING.md` for evidence and remaining physical-device checks.
 
 References: [Durable Object WebSockets](https://developers.cloudflare.com/durable-objects/best-practices/websockets/), [alarms](https://developers.cloudflare.com/durable-objects/api/alarms/), [Cloudflare TURN credentials](https://developers.cloudflare.com/realtime/turn/generate-credentials/).
+
+## App navigation and updates
+
+`/app` is the monitor, `/app/activity` is the event log, and `/app/settings` contains device and app settings. Setup uses `/app/create` and `/app/join`. TanStack Router handles navigation, history, and direct links. The room connection and audio live in the shared app layout and remain active while switching pages. Existing hash invitation links and setup query links still work.
+
+An available service-worker update appears in a toast on app load or after returning to the foreground. Updating requires an explicit click. While this device is monitoring or listening, the toast asks you to pause first and does not offer the update action. Theme, install instructions, and privacy information live in Settings.

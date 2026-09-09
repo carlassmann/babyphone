@@ -87,3 +87,20 @@ Browser checks passed for parent room creation, invite copy confirmation, Monito
 The primary agent verified HTTPS endpoints, manifest and service-worker responses, no-cache on the service worker, and matching production/local push configuration. Requests for local env filenames returned the HTML app shell, not env contents. All five runtime values matched local configuration, but private TURN and VAPID credentials were still plain-text Worker bindings and should be stored as Secrets.
 
 No real relayed audio, production push delivery, native install, physical-phone background behavior, or overnight reliability was verified in this run. The available browser did not expose the microphone/notification permission flow needed for media checks. TURN credential issuance succeeds, but that does not prove a relayed audio connection. The dark-mode illustration remains an unresolved visual issue; generated transparency attempts produced RGB checkerboards and were not integrated.
+
+## Navigation and update UI, September 9, 2026
+
+TanStack Router now owns the monitor, activity, settings, and setup routes. The shared room layout keeps microphone capture, WebSockets, and audio playback mounted while route content changes. The six-test Chromium/WebKit suite passed in 37.1 seconds after the changes. The multi-device lifecycle verifies browser Back/Forward while receiving audio, URL changes, settings reloads, legacy invitation handoff, and existing removal/reconnect behavior.
+
+The same lifecycle supplies a synthetic waiting-worker event to verify that the update toast offers no Update action during live listening, allows dismissal, and offers activation after playback stops. This tests the update guard, not a real browser update download. Separately, the in-app browser received and activated an actual new service worker through the toast; the room survived the reload. The toast sits above the mobile dock and does not cover desktop navigation.
+
+Desktop light/dark and mobile layouts were visually reviewed. Unknown routes display a recovery link back to the monitor. TypeScript and the production build passed. These changes were checked locally, not deployed.
+
+
+## Saved rooms and editing — September 9
+
+TypeScript, the production build, the Bun noise test, and workerd integration tests passed. All six Chromium/WebKit browser tests passed in 39.1 seconds.
+
+The browser lifecycle switches rooms during live audio, verifies playback stops, returns to the saved room, and resumes listening explicitly. Setup coverage checks invitation switching without revoking the previous membership, room renaming and persistence after reload, and rejection and forgetting of a revoked saved membership.
+
+The workerd checks cover parent-only room renaming, device rename authorization and room isolation, deactivation retaining membership while disabling push, rejection of late subscription requests, reactivation and subscription attachment, and baby deactivation clearing monitoring and online status. Push delivery after switching on a physical phone remains a deployment check.
