@@ -107,3 +107,6 @@ The workerd checks cover parent-only room renaming, device rename authorization 
 
 
 The camera invitation test decodes a real QR from a synthetic video stream, verifies code entry and track shutdown after scanning and cancellation, and checks permission denial leaves manual entry available. Chromium passed in 2.2 seconds. Physical iPhone camera scanning remains unverified.
+
+
+App scrolling: all seven browser tests passed in 38.3 seconds. The WebKit mobile check verifies setup has no document or content overflow at 375×812, then checks form controls remain reachable at 375×420 with document scroll at zero and the header fixed. Native iOS rubber-band gestures still need a physical-device check.
