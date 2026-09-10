@@ -65,7 +65,11 @@ export function RenameField({
           onChange={(event) => setName(event.target.value)}
         />
       </label>
-      <button className="secondary small" disabled={busy || !name.trim() || name.trim() === value}>
+      <button
+        type="submit"
+        className="secondary small"
+        disabled={busy || !name.trim() || name.trim() === value}
+      >
         Save
       </button>
       {error && (

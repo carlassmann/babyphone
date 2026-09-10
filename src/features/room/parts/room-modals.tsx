@@ -43,20 +43,26 @@ export function InvitationModal({
       </label>
       <div className="invite-actions">
         <button
+          type="button"
           className="primary full"
           onClick={() => onCopy(`${location.origin}/app/join#join=${invitation}`, 'link')}
         >
           {copied === 'link' ? <Check size={17} /> : <Link size={17} />}{' '}
           {copied === 'link' ? 'Link copied' : 'Copy invite link'}
         </button>
-        <button className="secondary full" onClick={() => onCopy(invitation, 'code')}>
+        <button type="button" className="secondary full" onClick={() => onCopy(invitation, 'code')}>
           <Copy size={16} />
           {copied === 'code' ? 'Code copied' : 'Copy code'}
         </button>
       </div>
       <p className="caption">Anyone with this invitation can join. Share it privately.</p>
       {!isBaby && (
-        <button className="secondary full" disabled={busy || !connected} onClick={onReset}>
+        <button
+          type="button"
+          className="secondary full"
+          disabled={busy || !connected}
+          onClick={onReset}
+        >
           Reset invitation link
         </button>
       )}
@@ -107,7 +113,7 @@ export function DeviceSettingsModal({
         value={session.name}
         onSave={(name) => request('rename-device', { ...session, name })}
       />
-      <button className="secondary full" disabled={busy} onClick={onChangeRole}>
+      <button type="button" className="secondary full" disabled={busy} onClick={onChangeRole}>
         Switch to {isBaby ? 'parent' : 'baby'} device
         <ChevronRight size={17} />
       </button>
@@ -136,6 +142,7 @@ export function DeviceSettingsModal({
                 </p>
               </div>
               <button
+                type="button"
                 className="quiet danger"
                 disabled={busy || !connected}
                 onClick={() => onRemoveDevice(device.id)}
@@ -153,7 +160,7 @@ export function DeviceSettingsModal({
         </>
       )}
       <hr />
-      <button className="quiet danger" disabled={busy} onClick={onLeave}>
+      <button type="button" className="quiet danger" disabled={busy} onClick={onLeave}>
         Leave this room <ArrowRight size={16} />
       </button>
       <p className="caption">You’ll need the invitation code to join again.</p>

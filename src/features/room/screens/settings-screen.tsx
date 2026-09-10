@@ -25,7 +25,7 @@ export function SettingsScreen() {
         <h3>{room.isBaby ? 'Device setup' : 'Notifications'}</h3>
         {room.isBaby ? <BabySetup /> : <NotificationSetup room={room} />}
       </section>
-      <button className="secondary full" onClick={room.openSettings}>
+      <button type="button" className="secondary full" onClick={room.openSettings}>
         <Smartphone size={18} /> Manage this device
       </button>
       {room.preferences}
@@ -58,6 +58,7 @@ function NotificationSetup({ room }: { room: ReturnType<typeof useRoom> }) {
         the background.
       </p>
       <button
+        type="button"
         className={room.pushEnabled ? 'secondary full small' : 'primary full small'}
         disabled={room.busy || room.pushEnabled || !room.connected}
         onClick={() => void room.enableNotifications()}
@@ -67,6 +68,7 @@ function NotificationSetup({ room }: { room: ReturnType<typeof useRoom> }) {
       </button>
       {room.pushEnabled && (
         <button
+          type="button"
           className="quiet full small"
           disabled={room.busy}
           onClick={() => void room.testNotification()}

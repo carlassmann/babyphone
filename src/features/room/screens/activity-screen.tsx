@@ -10,7 +10,7 @@ export function ActivityScreen() {
         <h3>Activity</h3>
         <span className="caption">Last 24 hours</span>
         {!isBaby && events.length > 0 && (
-          <button className="quiet small" onClick={() => void clearEvents()}>
+          <button type="button" className="quiet small" onClick={() => void clearEvents()}>
             Clear activity
           </button>
         )}

@@ -338,19 +338,21 @@ export function Room({
             deviceName={session.name}
             parentAwake={!isBaby && parentAwake}
           />
-          {!isBaby && !parentAwake && (
-            <p className="notice">
-              Screen wake lock unavailable. Keep this screen awake manually while listening.
-            </p>
-          )}
-          {!connected && <ConnectionNotice connection={connection} />}
-          {error && <ErrorNotice error={error} onDismiss={() => setError('')} />}
-          {!isBaby && latestEvent && (
-            <EventNotice
-              event={latestEvent}
-              onDismiss={() => setDismissedEventsThrough(latestEvent.at)}
-            />
-          )}
+          <div className="room-alerts">
+            {!isBaby && !parentAwake && (
+              <p className="notice">
+                Screen wake lock unavailable. Keep this screen awake manually while listening.
+              </p>
+            )}
+            {!connected && <ConnectionNotice connection={connection} />}
+            {error && <ErrorNotice error={error} onDismiss={() => setError('')} />}
+            {!isBaby && latestEvent && (
+              <EventNotice
+                event={latestEvent}
+                onDismiss={() => setDismissedEventsThrough(latestEvent.at)}
+              />
+            )}
+          </div>
           <RoomProvider
             value={{
               active,

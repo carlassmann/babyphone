@@ -55,6 +55,7 @@ function BabyMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
         <AudioMeter value={room.active ? room.level : 0} />
       </div>
       <button
+        type="button"
         className={`primary full ${room.active ? 'stop' : ''}`}
         disabled={room.busy || (!room.active && !room.connected)}
         onClick={() => void room.toggleMonitoring()}
@@ -101,7 +102,7 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
           <br />
           Open the invitation on the phone that stays in the nursery.
         </p>
-        <button className="primary" onClick={room.openInvitation}>
+        <button type="button" className="primary" onClick={room.openInvitation}>
           Invite a baby device <ArrowRight size={18} />
         </button>
       </div>
@@ -145,11 +146,16 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
                 : 'No sounds detected yet'}
             </span>
             {isListening(room.audioStatuses[device.id]) ? (
-              <button className="secondary small" onClick={() => room.stopListening(device.id)}>
+              <button
+                type="button"
+                className="secondary small"
+                onClick={() => room.stopListening(device.id)}
+              >
                 <Pause size={16} /> Stop listening
               </button>
             ) : (
               <button
+                type="button"
                 className="primary small"
                 disabled={!room.connected || !device.monitoring}
                 onClick={() => room.listenTo(device.id)}
@@ -163,7 +169,9 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
               <AudioLines size={16} />
               {room.audioStatuses[device.id]}
               {room.audioStatuses[device.id]?.includes('Resume') && (
-                <button onClick={() => room.resumeAudio(device.id)}>Resume audio</button>
+                <button type="button" onClick={() => room.resumeAudio(device.id)}>
+                  Resume audio
+                </button>
               )}
             </div>
           )}

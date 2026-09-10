@@ -91,10 +91,18 @@ export function Welcome({
               with you.
             </p>
             <div className="welcome-actions">
-              <button className="primary" onClick={() => void navigate({ to: '/app/create' })}>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => void navigate({ to: '/app/create' })}
+              >
                 Create a room <ArrowRight size={18} />
               </button>
-              <button className="secondary" onClick={() => void navigate({ to: '/app/join' })}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => void navigate({ to: '/app/join' })}
+              >
                 Join a room <Link size={18} />
               </button>
             </div>
@@ -207,6 +215,7 @@ export function Welcome({
               </p>
             )}
             <button
+              type="submit"
               className="primary full"
               disabled={busy || (mode === 'join' && !roomKey.trim())}
             >

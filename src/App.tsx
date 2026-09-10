@@ -154,6 +154,7 @@ export function App() {
   }
   const roomSwitcher = (
     <button
+      type="button"
       className="room-switcher"
       onClick={() => {
         setSwitchError('');
@@ -189,6 +190,7 @@ export function App() {
             <div className="shell-actions">
               {rooms.length > 0 && roomSwitcher}
               <button
+                type="button"
                 className="icon-button"
                 aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -201,12 +203,12 @@ export function App() {
                 </Link>
               )}
               {appMode && rooms.length === 0 && (
-                <button className="quiet small" onClick={() => setModal('privacy')}>
+                <button type="button" className="quiet small" onClick={() => setModal('privacy')}>
                   Privacy
                 </button>
               )}
               {!pwa.installed && (rooms.length === 0 || !appMode) && (
-                <button className="quiet small" onClick={() => setModal('install')}>
+                <button type="button" className="quiet small" onClick={() => setModal('install')}>
                   <Download size={17} />
                   <span>Get the app</span>
                 </button>
@@ -219,12 +221,14 @@ export function App() {
           theme={theme === 'dark' ? 'dark' : 'light'}
           position="bottom-right"
           offset={{ bottom: 96, right: 24 }}
-          mobileOffset={{ bottom: 104, left: 16, right: 16 }}
+          mobileOffset={{ bottom: session ? 104 : 16, left: 16, right: 16 }}
           closeButton
         />
         {!appMode && (
           <footer>
-            <button onClick={() => setModal('privacy')}>Privacy & how it works</button>
+            <button type="button" onClick={() => setModal('privacy')}>
+              Privacy & how it works
+            </button>
           </footer>
         )}
         {session &&
@@ -309,17 +313,18 @@ export function AppScreen() {
           <section className="side-card preferences">
             <h3>This app</h3>
             <button
+              type="button"
               className="quiet full"
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
               {theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             </button>
-            <button className="quiet full" onClick={() => setModal('install')}>
+            <button type="button" className="quiet full" onClick={() => setModal('install')}>
               <Download size={18} />
               {pwa.installed ? 'App installed' : 'Install Pip'}
             </button>
-            <button className="quiet full" onClick={() => setModal('privacy')}>
+            <button type="button" className="quiet full" onClick={() => setModal('privacy')}>
               Privacy
             </button>
           </section>

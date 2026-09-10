@@ -37,6 +37,7 @@ export function RoomHeader({
       </nav>
       <div className="room-tools">
         <button
+          type="button"
           className="icon-button"
           aria-label={dimmed ? 'Brighten screen' : 'Dim screen'}
           aria-pressed={dimmed}
@@ -44,7 +45,12 @@ export function RoomHeader({
         >
           {dimmed ? <Sun size={19} /> : <Moon size={19} />}
         </button>
-        <button className="secondary small" aria-label="Invite device" onClick={onInvite}>
+        <button
+          type="button"
+          className="secondary small"
+          aria-label="Invite device"
+          onClick={onInvite}
+        >
           <Plus size={17} />
           <span>Invite device</span>
         </button>

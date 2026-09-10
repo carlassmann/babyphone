@@ -22,10 +22,10 @@ export function InvitationModal({
         Switch from {currentRoom}? Monitoring and notifications follow the active room. You can
         return to your saved rooms anytime.
       </p>
-      <button className="primary full" disabled={joining} onClick={onConfirm}>
+      <button type="button" className="primary full" disabled={joining} onClick={onConfirm}>
         {joining ? 'Switching room…' : 'Switch room and join'}
       </button>
-      <button className="secondary full" disabled={joining} onClick={onDismiss}>
+      <button type="button" className="secondary full" disabled={joining} onClick={onDismiss}>
         Keep current room
       </button>
       {error && (
@@ -66,6 +66,7 @@ export function RoomsModal({
         {rooms.map((room) => (
           <div className="saved-room" key={room.roomId}>
             <button
+              type="button"
               className="secondary full"
               disabled={switching}
               onClick={() => onActivate(room)}
@@ -80,6 +81,7 @@ export function RoomsModal({
             </button>
             {room.deviceId !== activeDeviceId && (
               <button
+                type="button"
                 className="quiet small"
                 disabled={switching}
                 aria-label={`Forget ${room.roomName}`}
@@ -91,10 +93,20 @@ export function RoomsModal({
           </div>
         ))}
       </div>
-      <button className="primary full" disabled={switching} onClick={() => onAdd('/app/create')}>
+      <button
+        type="button"
+        className="primary full"
+        disabled={switching}
+        onClick={() => onAdd('/app/create')}
+      >
         Create a room
       </button>
-      <button className="secondary full" disabled={switching} onClick={() => onAdd('/app/join')}>
+      <button
+        type="button"
+        className="secondary full"
+        disabled={switching}
+        onClick={() => onAdd('/app/join')}
+      >
         Join a room
       </button>
       {error && (
@@ -135,7 +147,7 @@ function InstallContent({ pwa }: { pwa: ReturnType<typeof usePwa> }) {
           Pip is installed on this device.
         </p>
       ) : pwa.canInstall ? (
-        <button className="primary full" onClick={() => void pwa.install()}>
+        <button type="button" className="primary full" onClick={() => void pwa.install()}>
           Install Pip <Download size={18} />
         </button>
       ) : (

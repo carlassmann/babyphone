@@ -50,7 +50,7 @@ export function ErrorNotice({ error, onDismiss }: { error: string; onDismiss: ()
   return (
     <p role="alert" className="notice">
       <span>{error}</span>
-      <button className="icon-button" aria-label="Dismiss error" onClick={onDismiss}>
+      <button type="button" className="icon-button" aria-label="Dismiss error" onClick={onDismiss}>
         <X size={16} />
       </button>
     </p>
@@ -80,7 +80,12 @@ export function EventNotice({ event, onDismiss }: { event: Alert; onDismiss: () 
         {event.name}
         {detail}
       </span>
-      <button className="icon-button" aria-label="Dismiss notification" onClick={onDismiss}>
+      <button
+        type="button"
+        className="icon-button"
+        aria-label="Dismiss notification"
+        onClick={onDismiss}
+      >
         <X size={16} />
       </button>
     </div>
