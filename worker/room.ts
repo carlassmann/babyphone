@@ -46,7 +46,7 @@ function pushDeliveryError(status: number) {
 function alertPayload(event: Alert) {
   const copy = {
     noise: {
-      title: 'Sound detected',
+      title: 'A little sound',
       detail: ' detected sustained noise.',
     },
     paused: {

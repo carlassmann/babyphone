@@ -169,8 +169,8 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   await expect
     .poll(() => parent.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime))
     .toBeGreaterThan(playingAt + 0.2);
-  await expect(parent.getByText('Sound detected', { exact: true })).toBeVisible({ timeout: 30000 });
-  await expect(second.getByText('Sound detected', { exact: true })).toBeVisible();
+  await expect(parent.getByText('A little sound', { exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(second.getByText('A little sound', { exact: true })).toBeVisible();
   await baby.screenshot({ path: 'artifacts/baby-mobile.png', fullPage: true });
   await parent.screenshot({ path: 'artifacts/parent-desktop.png', fullPage: true });
   await babyContext.setOffline(true);

@@ -1,4 +1,4 @@
-import { NoiseDetector, rms } from '../../../noise';
+import { LevelHold, NoiseDetector, rms } from '../../../noise';
 
 const SAMPLE_INTERVAL_MS = 100;
 const WAKE_RETRY_MS = 1_000;
@@ -9,6 +9,7 @@ export class BabyAudio {
   private active = false;
   private audioContext?: AudioContext;
   private detector = new NoiseDetector();
+  private levelHold = new LevelHold();
   private generation = 0;
   private sampleTimer?: ReturnType<typeof setInterval>;
   private wakeLock?: WakeLockSentinel;
@@ -69,6 +70,7 @@ export class BabyAudio {
 
   private startSampling(stream: MediaStream, audioContext: AudioContext) {
     this.detector = new NoiseDetector(this.detector.threshold);
+    this.levelHold = new LevelHold();
     const source = audioContext.createMediaStreamSource(stream);
     const analyser = audioContext.createAnalyser();
     analyser.fftSize = 2_048;
@@ -78,8 +80,9 @@ export class BabyAudio {
     this.sampleTimer = setInterval(() => {
       analyser.getFloatTimeDomainData(samples);
       const level = rms(samples);
-      this.onLevel(level);
-      if (this.detector.sample(level, performance.now())) this.onNoise();
+      const now = performance.now();
+      this.onLevel(this.levelHold.sample(level, now));
+      if (this.detector.sample(level, now)) this.onNoise();
     }, SAMPLE_INTERVAL_MS);
   }
 

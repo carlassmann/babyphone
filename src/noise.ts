@@ -1,4 +1,19 @@
-export const SENSITIVITY_THRESHOLDS = [0.04, 0.015, 0.005] as const;
+export const SENSITIVITY_THRESHOLDS = [0.012, 0.003, 0.001] as const;
+
+export class LevelHold {
+  private level = 0;
+  private until = -Infinity;
+
+  constructor(private duration = 600) {}
+
+  sample(level: number, now: number) {
+    if (level >= this.level || now >= this.until) {
+      this.level = level;
+      this.until = now + this.duration;
+    }
+    return this.level;
+  }
+}
 
 export class NoiseDetector {
   private aboveSince: number | null = null;
