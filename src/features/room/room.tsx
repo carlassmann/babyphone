@@ -331,59 +331,61 @@ export function Room({
         onToggleDim={() => setDim(!dim)}
       />
       <div className="room-scroll">
-        <ConnectionSummary
-          connected={connected}
-          connection={connection}
-          deviceName={session.name}
-          parentAwake={!isBaby && parentAwake}
-        />
-        {!isBaby && !parentAwake && (
-          <p className="notice">
-            Screen wake lock unavailable. Keep this screen awake manually while listening.
-          </p>
-        )}
-        {!connected && <ConnectionNotice connection={connection} />}
-        {error && <ErrorNotice error={error} onDismiss={() => setError('')} />}
-        {!isBaby && latestEvent && (
-          <EventNotice
-            event={latestEvent}
-            onDismiss={() => setDismissedEventsThrough(latestEvent.at)}
+        <div className="room-content">
+          <ConnectionSummary
+            connected={connected}
+            connection={connection}
+            deviceName={session.name}
+            parentAwake={!isBaby && parentAwake}
           />
-        )}
-        <RoomProvider
-          value={{
-            active,
-            audioStatuses,
-            awake,
-            babies,
-            busy,
-            connected,
-            events,
-            isBaby,
-            level,
-            parents,
-            preferences,
-            pushEnabled: push,
-            pushTestMessage: pushTest,
-            sensitivity,
-            session,
-            changeSensitivity,
-            clearEvents,
-            enableNotifications: notify,
-            listenTo,
-            openInvitation: () => setModal('invite'),
-            openSettings: () => setModal('settings'),
-            resumeAudio,
-            stopListening: (deviceId) => callsRef.current?.stop(deviceId),
-            testNotification,
-            toggleMonitoring,
-          }}
-        >
-          <div className="room-grid">
-            <Outlet />
-          </div>
-        </RoomProvider>
-        {pwa.error && <p className="notice">{pwa.error}</p>}
+          {!isBaby && !parentAwake && (
+            <p className="notice">
+              Screen wake lock unavailable. Keep this screen awake manually while listening.
+            </p>
+          )}
+          {!connected && <ConnectionNotice connection={connection} />}
+          {error && <ErrorNotice error={error} onDismiss={() => setError('')} />}
+          {!isBaby && latestEvent && (
+            <EventNotice
+              event={latestEvent}
+              onDismiss={() => setDismissedEventsThrough(latestEvent.at)}
+            />
+          )}
+          <RoomProvider
+            value={{
+              active,
+              audioStatuses,
+              awake,
+              babies,
+              busy,
+              connected,
+              events,
+              isBaby,
+              level,
+              parents,
+              preferences,
+              pushEnabled: push,
+              pushTestMessage: pushTest,
+              sensitivity,
+              session,
+              changeSensitivity,
+              clearEvents,
+              enableNotifications: notify,
+              listenTo,
+              openInvitation: () => setModal('invite'),
+              openSettings: () => setModal('settings'),
+              resumeAudio,
+              stopListening: (deviceId) => callsRef.current?.stop(deviceId),
+              testNotification,
+              toggleMonitoring,
+            }}
+          >
+            <div className="room-grid">
+              <Outlet />
+            </div>
+          </RoomProvider>
+          {pwa.error && <p className="notice">{pwa.error}</p>}
+        </div>
       </div>
       {modal === 'invite' && (
         <InvitationModal

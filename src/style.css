@@ -1543,6 +1543,7 @@ body:has(.application) {
   overflow: hidden;
 }
 .application {
+  max-width: none;
   position: fixed;
   top: var(--visual-viewport-top, 0);
   right: 0;
@@ -1554,8 +1555,18 @@ body:has(.application) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding-right: 0;
+  padding-left: 0;
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
+}
+.application > .topbar,
+.application .room-header,
+.application .room-content {
+  width: calc(100% - 64px);
+  max-width: 1056px;
+  margin-right: auto;
+  margin-left: auto;
 }
 .application > .topbar,
 .application .room-header {
@@ -1566,7 +1577,7 @@ body:has(.application) {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: none;
-  margin: 0;
+  margin: 0 auto;
   align-items: safe center;
   scroll-padding-block: 16px;
 }
@@ -1591,6 +1602,11 @@ dialog {
   overscroll-behavior: none;
 }
 @media (max-width: 860px) {
+  .application > .topbar,
+  .application .room-header,
+  .application .room-content {
+    width: calc(100% - 32px);
+  }
   .room-scroll {
     padding-bottom: calc(112px + env(safe-area-inset-bottom));
     scroll-padding-bottom: calc(112px + env(safe-area-inset-bottom));

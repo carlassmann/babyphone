@@ -100,6 +100,11 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
     await page.getByRole('button', { name: 'Join room', exact: true }).click();
     await expect(page.getByText('Connected', { exact: true })).toBeVisible();
   }
+  expect(
+    await parent
+      .locator('.room-scroll')
+      .evaluate((element) => element.getBoundingClientRect().right === innerWidth),
+  ).toBe(true);
   await expect(parent.getByText('Screen wake lock unavailable.', { exact: false })).toBeVisible();
   await parent.getByRole('link', { name: 'Monitor', exact: true }).click();
   await expect(parent.getByText('Screen staying awake', { exact: true })).toBeVisible();
