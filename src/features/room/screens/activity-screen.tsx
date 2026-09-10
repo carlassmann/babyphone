@@ -25,7 +25,7 @@ export function ActivityScreen() {
               <div>
                 <strong>
                   {event.kind === 'noise'
-                    ? 'A little sound'
+                    ? 'Sound detected'
                     : event.kind === 'paused'
                       ? 'Monitoring paused'
                       : 'Device disconnected'}

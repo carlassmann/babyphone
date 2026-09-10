@@ -46,7 +46,7 @@ function BabyMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
           <span>Room sound</span>
           <span>
             {room.active && room.level >= SENSITIVITY_THRESHOLDS[room.sensitivity - 1]!
-              ? 'A little sound'
+              ? 'Sound detected'
               : room.active
                 ? 'Quiet'
                 : 'Microphone off'}
