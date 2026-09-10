@@ -11,3 +11,12 @@ test('noise requires sustained sound, resets for silence, and repeats only after
   expect(detector.sample(0.2, 20000)).toBe(false);
   expect(detector.sample(0.2, 23100)).toBe(true);
 });
+
+test('default sensitivity detects normal speech with short gaps', () => {
+  const detector = new NoiseDetector();
+  for (let now = 0; now <= 1400; now += 100) {
+    const speechLevel = now === 700 || now === 800 ? 0.005 : 0.02;
+    expect(detector.sample(speechLevel, now)).toBe(false);
+  }
+  expect(detector.sample(0.02, 1500)).toBe(true);
+});

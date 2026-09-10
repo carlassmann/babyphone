@@ -1,4 +1,23 @@
 import { HEARTBEAT_MS, OFFLINE_MS, type ServerMessage, type Session } from './protocol';
+
+export type ConnectionStatus =
+  | 'Connecting'
+  | 'Connected'
+  | 'Connection lost'
+  | 'Access removed'
+  | 'Room inactive'
+  | 'Open in another tab';
+
+const TERMINAL_CLOSE_STATUSES: Partial<Record<number, ConnectionStatus>> = {
+  4001: 'Access removed',
+  4008: 'Room inactive',
+  4009: 'Open in another tab',
+};
+
+const INITIAL_RETRY_MS = 500;
+const MAX_RETRY_MS = 5_000;
+const REQUEST_TIMEOUT_MS = 10_000;
+
 export class RoomConnection {
   private socket?: WebSocket;
   private stopped = false;
@@ -11,7 +30,7 @@ export class RoomConnection {
   constructor(
     private session: Session,
     private onMessage: (message: ServerMessage) => void,
-    private onStatus: (state: string) => void,
+    private onStatus: (status: ConnectionStatus) => void,
     private heartbeat: () => { monitoring: boolean; level: number },
   ) {
     this.connect();
@@ -50,23 +69,15 @@ export class RoomConnection {
       this.ready = false;
       clearInterval(this.ticker);
       if (this.stopped) return;
-      if (event.code === 4001) {
-        this.onStatus('Access removed');
-        this.stopped = true;
-        return;
-      }
-      if (event.code === 4008) {
-        this.onStatus('Room inactive');
-        this.stopped = true;
-        return;
-      }
-      if (event.code === 4009) {
-        this.onStatus('Open in another tab');
+      const terminalStatus = TERMINAL_CLOSE_STATUSES[event.code];
+      if (terminalStatus) {
+        this.onStatus(terminalStatus);
         this.stopped = true;
         return;
       }
       this.onStatus('Connection lost');
-      this.retry = setTimeout(() => this.connect(), Math.min(500 * 2 ** this.attempt++, 5000));
+      const retryDelay = Math.min(INITIAL_RETRY_MS * 2 ** this.attempt++, MAX_RETRY_MS);
+      this.retry = setTimeout(() => this.connect(), retryDelay);
     };
     socket.onerror = () => socket.close();
     this.ticker = setInterval(() => {
@@ -81,7 +92,7 @@ export class RoomConnection {
         socket.onerror = null;
         socket.close();
         this.onStatus('Connection lost');
-        this.retry = setTimeout(() => this.connect(), 500);
+        this.retry = setTimeout(() => this.connect(), INITIAL_RETRY_MS);
       } else this.send({ type: 'heartbeat', ...this.heartbeat() });
     }, HEARTBEAT_MS);
   }
@@ -116,7 +127,7 @@ export async function request(path: string, body: object) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   const result = await response.json();
   if (!response.ok)

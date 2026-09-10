@@ -1,19 +1,45 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
 import { Toaster } from 'sonner';
-import { Check, ChevronDown, Download, Moon, Sun } from 'lucide-react';
+import { ChevronDown, Download, Moon, Sun } from 'lucide-react';
 import { usePwa } from './pwa';
 import { Welcome } from './Welcome';
-import { Room } from './Room';
-import { Modal } from './Modal';
+import { Room } from './features/room';
 import { ApiError, request } from './connection';
 import type { Session } from './protocol';
-import { readSession, readRooms, storeActive, storeRooms } from './sessions';
+import { readSession, readRooms, sessionsEqual, storeActive, storeRooms } from './sessions';
+import { AppInfoModal, InvitationModal, RoomsModal } from './AppModals';
+
+type Theme = 'dark' | 'light';
+type AppModal = '' | 'rooms' | 'install' | 'privacy';
 
 export function App() {
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const updateViewport = () => {
+      document.documentElement.style.setProperty(
+        '--visual-viewport-top',
+        `${viewport.offsetTop}px`,
+      );
+      document.documentElement.style.setProperty(
+        '--visual-viewport-height',
+        `${viewport.height}px`,
+      );
+    };
+    updateViewport();
+    viewport.addEventListener('resize', updateViewport);
+    viewport.addEventListener('scroll', updateViewport);
+    return () => {
+      viewport.removeEventListener('resize', updateViewport);
+      viewport.removeEventListener('scroll', updateViewport);
+      document.documentElement.style.removeProperty('--visual-viewport-top');
+      document.documentElement.style.removeProperty('--visual-viewport-height');
+    };
+  }, []);
   const [session, setSession] = useState<Session | null>(readSession);
   const [rooms, setRooms] = useState(readRooms);
-  const [modal, setModal] = useState('');
+  const [modal, setModal] = useState<AppModal>('');
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState('');
   const route = useLocation();
@@ -45,7 +71,7 @@ export function App() {
       const own = state.devices.find((device: { id: string }) => device.id === room.deviceId);
       if (!own) throw new Error('Your access to this room was removed.');
       if (room.deviceId !== session?.deviceId) await deactivateCurrent();
-      save({
+      saveSession({
         ...room,
         roomName: state.roomName || room.roomName,
         roomKey: state.roomKey || room.roomKey,
@@ -93,21 +119,20 @@ export function App() {
   const updateSession = useCallback((value: Session) => {
     setRooms((current) => {
       const old = current.find((room) => room.deviceId === value.deviceId);
-      if (old && JSON.stringify(old) === JSON.stringify(value)) return current;
+      if (old && sessionsEqual(old, value)) return current;
       return storeRooms([...current.filter((room) => room.roomId !== value.roomId), value]);
     });
     setSession((current) => {
-      if (current?.deviceId !== value.deviceId || JSON.stringify(current) === JSON.stringify(value))
-        return current;
+      if (current?.deviceId !== value.deviceId || sessionsEqual(current, value)) return current;
       storeActive(value);
       return value;
     });
   }, []);
 
   const pwa = usePwa();
-  const [theme, setTheme] = useState(
+  const [theme, setTheme] = useState<Theme>(
     () =>
-      localStorage.getItem('pip-theme') ||
+      (localStorage.getItem('pip-theme') as Theme | null) ||
       (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
   );
   useEffect(() => {
@@ -115,7 +140,7 @@ export function App() {
     localStorage.setItem('pip-theme', theme);
   }, [theme]);
   const appMode = route.pathname.startsWith('/app') || !!session || !!incoming;
-  function save(value: Session | null) {
+  function saveSession(value: Session | null) {
     setRooms((current) =>
       storeRooms(
         value
@@ -144,7 +169,7 @@ export function App() {
     <AppContext.Provider
       value={{
         session,
-        save,
+        saveSession,
         pwa,
         theme,
         setTheme,
@@ -176,7 +201,7 @@ export function App() {
                 </Link>
               )}
               {appMode && rooms.length === 0 && (
-                <button className="quiet small" onClick={() => setModal('about')}>
+                <button className="quiet small" onClick={() => setModal('privacy')}>
                   Privacy
                 </button>
               )}
@@ -199,158 +224,39 @@ export function App() {
         />
         {!appMode && (
           <footer>
-            <button onClick={() => setModal('about')}>Privacy & how it works</button>
+            <button onClick={() => setModal('privacy')}>Privacy & how it works</button>
           </footer>
         )}
         {session &&
           incoming &&
           incoming !== session.roomKey &&
           !incoming.startsWith(session.roomId + '.') && (
-            <Modal
-              title="Open this invitation?"
-              close={() => {
-                if (!joining) dismissInvitation();
-              }}
-            >
-              <p>
-                Switch from {session.roomName}? Monitoring and notifications follow the active room.
-                You can return to your saved rooms anytime.
-              </p>
-              <button
-                className="primary full"
-                disabled={joining}
-                onClick={() => void openInvitation()}
-              >
-                {joining ? 'Switching room…' : 'Switch room and join'}
-              </button>
-              <button className="secondary full" disabled={joining} onClick={dismissInvitation}>
-                Keep current room
-              </button>
-              {joinError && (
-                <p role="alert" className="notice">
-                  {joinError}
-                </p>
-              )}
-            </Modal>
+            <InvitationModal
+              currentRoom={session.roomName}
+              error={joinError}
+              joining={joining}
+              onConfirm={() => void openInvitation()}
+              onDismiss={dismissInvitation}
+            />
           )}
         {modal === 'rooms' && (
-          <Modal
-            title="Your rooms"
-            close={() => {
-              if (!switching) setModal('');
-            }}
-          >
-            <p>
-              Only the active room monitors or sends notifications to this device. Switching stops
-              live audio.
-            </p>
-            <div className="saved-rooms">
-              {rooms.map((room) => (
-                <div className="saved-room" key={room.roomId}>
-                  <button
-                    className="secondary full"
-                    disabled={switching}
-                    onClick={() => void activate(room).catch(() => {})}
-                  >
-                    <span>
-                      {room.roomName}
-                      <small>
-                        {room.name} · {room.role === 'baby' ? 'Baby' : 'Parent'}
-                      </small>
-                    </span>
-                    {room.deviceId === session?.deviceId && <Check size={18} />}
-                  </button>
-                  {room.deviceId !== session?.deviceId && (
-                    <button
-                      className="quiet small"
-                      disabled={switching}
-                      aria-label={'Forget ' + room.roomName}
-                      onClick={() =>
-                        setRooms((current) =>
-                          storeRooms(current.filter((saved) => saved.deviceId !== room.deviceId)),
-                        )
-                      }
-                    >
-                      Forget
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            <button
-              className="primary full"
-              disabled={switching}
-              onClick={() => void addRoom('/app/create').catch(() => {})}
-            >
-              Create a room
-            </button>
-            <button
-              className="secondary full"
-              disabled={switching}
-              onClick={() => void addRoom('/app/join').catch(() => {})}
-            >
-              Join a room
-            </button>
-            {switchError && (
-              <p role="alert" className="notice">
-                {switchError}
-              </p>
-            )}
-          </Modal>
+          <RoomsModal
+            activeDeviceId={session?.deviceId}
+            error={switchError}
+            rooms={rooms}
+            switching={switching}
+            onActivate={(room) => void activate(room).catch(() => {})}
+            onAdd={(path) => void addRoom(path).catch(() => {})}
+            onClose={() => setModal('')}
+            onForget={(room) =>
+              setRooms((current) =>
+                storeRooms(current.filter((saved) => saved.deviceId !== room.deviceId)),
+              )
+            }
+          />
         )}
-        {modal && modal !== 'rooms' && (
-          <Modal title={modal === 'install' ? 'Install Pip' : 'Privacy'} close={() => setModal('')}>
-            {modal === 'install' ? (
-              <>
-                <div className="install-icon">
-                  <img src="/icon.svg" alt="Pip" />
-                </div>
-                <p>Keep Pip a tap away. Install it on both devices for the best experience.</p>
-                {pwa.installed ? (
-                  <p className="notice success">
-                    <Check />
-                    Pip is installed on this device.
-                  </p>
-                ) : pwa.canInstall ? (
-                  <button className="primary full" onClick={() => void pwa.install()}>
-                    Install Pip <Download size={18} />
-                  </button>
-                ) : (
-                  <div className="instructions">
-                    <p>
-                      <strong>iPhone / iPad</strong>
-                      <br />
-                      In Safari, tap Share → Add to Home Screen. Open Pip from its new icon before
-                      enabling notifications.
-                    </p>
-                    <p>
-                      <strong>Android / desktop</strong>
-                      <br />
-                      Use your browser menu → Install app or Add to Home Screen. In Safari on Mac,
-                      choose File → Add to Dock.
-                    </p>
-                  </div>
-                )}
-                <p className="caption">
-                  The baby device must stay plugged in, with Pip open and its screen awake.
-                </p>
-              </>
-            ) : (
-              <>
-                <p>
-                  Sound is analyzed on the baby device. Pip never records it. Live listening uses an
-                  encrypted audio connection between your devices, with a relay only when needed.
-                </p>
-                <p>
-                  Your invitation code is the key to your room. Share it only with people you trust.
-                </p>
-                <p className="notice">
-                  This is a prototype and an extra pair of ears. Keep checking on your baby;
-                  browsers, networks, and notifications can stop working.
-                </p>
-              </>
-            )}
-          </Modal>
+        {(modal === 'install' || modal === 'privacy') && (
+          <AppInfoModal kind={modal} pwa={pwa} onClose={() => setModal('')} />
         )}
       </div>
     </AppContext.Provider>
@@ -359,11 +265,11 @@ export function App() {
 
 type AppContextValue = {
   session: Session | null;
-  save: (session: Session | null) => void;
+  saveSession: (session: Session | null) => void;
   pwa: ReturnType<typeof usePwa>;
-  theme: string;
-  setTheme: (theme: string) => void;
-  setModal: (modal: string) => void;
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+  setModal: (modal: AppModal) => void;
   incoming: string;
   roomSwitcher: React.ReactNode;
   updateSession: (session: Session) => void;
@@ -375,18 +281,27 @@ function useApp() {
   return value;
 }
 export function LandingScreen() {
-  const { save } = useApp();
-  return <Welcome onJoin={save} />;
+  const { saveSession } = useApp();
+  return <Welcome onJoin={saveSession} />;
 }
 export function AppScreen() {
-  const { session, save, pwa, incoming, theme, setTheme, setModal, roomSwitcher, updateSession } =
-    useApp();
+  const {
+    session,
+    saveSession,
+    pwa,
+    incoming,
+    theme,
+    setTheme,
+    setModal,
+    roomSwitcher,
+    updateSession,
+  } = useApp();
   if (session)
     return (
       <Room
         key={`${session.deviceId}-${session.role}`}
         session={session}
-        save={save}
+        save={saveSession}
         pwa={pwa}
         roomSwitcher={roomSwitcher}
         updateSession={updateSession}
@@ -404,12 +319,12 @@ export function AppScreen() {
               <Download size={18} />
               {pwa.installed ? 'App installed' : 'Install Pip'}
             </button>
-            <button className="quiet full" onClick={() => setModal('about')}>
+            <button className="quiet full" onClick={() => setModal('privacy')}>
               Privacy
             </button>
           </section>
         }
       />
     );
-  return <Welcome key={incoming} onJoin={save} appMode />;
+  return <Welcome key={incoming} onJoin={saveSession} appMode />;
 }

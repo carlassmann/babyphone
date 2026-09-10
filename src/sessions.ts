@@ -1,6 +1,9 @@
 import type { Session } from './protocol';
 
-function valid(value: unknown): value is Session {
+const ACTIVE_SESSION_KEY = 'pip-session';
+const SAVED_ROOMS_KEY = 'pip-rooms';
+
+function isSession(value: unknown): value is Session {
   const session = value as Session | null;
   return (
     !!session?.token &&
@@ -9,29 +12,46 @@ function valid(value: unknown): value is Session {
     ['baby', 'parent'].includes(session.role)
   );
 }
-export function readSession(): Session | null {
+
+function readStoredJson(key: string): unknown {
   try {
-    const value = JSON.parse(localStorage.getItem('pip-session') || 'null');
-    return valid(value) ? value : null;
+    return JSON.parse(localStorage.getItem(key) || 'null');
   } catch {
     return null;
   }
 }
+
+export function readSession(): Session | null {
+  const value = readStoredJson(ACTIVE_SESSION_KEY);
+  return isSession(value) ? value : null;
+}
+
 export function readRooms(): Session[] {
-  let rooms: Session[] = [];
-  try {
-    const value = JSON.parse(localStorage.getItem('pip-rooms') || '[]');
-    if (Array.isArray(value)) rooms = value.filter(valid);
-  } catch {}
+  const value = readStoredJson(SAVED_ROOMS_KEY);
+  let rooms = Array.isArray(value) ? value.filter(isSession) : [];
   const active = readSession();
   if (active) rooms = [...rooms.filter((room) => room.roomId !== active.roomId), active];
   return rooms;
 }
+
 export function storeActive(session: Session | null) {
-  if (session) localStorage.setItem('pip-session', JSON.stringify(session));
-  else localStorage.removeItem('pip-session');
+  if (session) localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(session));
+  else localStorage.removeItem(ACTIVE_SESSION_KEY);
 }
+
 export function storeRooms(rooms: Session[]) {
-  localStorage.setItem('pip-rooms', JSON.stringify(rooms));
+  localStorage.setItem(SAVED_ROOMS_KEY, JSON.stringify(rooms));
   return rooms;
+}
+
+export function sessionsEqual(left: Session, right: Session) {
+  return (
+    left.roomId === right.roomId &&
+    left.roomName === right.roomName &&
+    left.roomKey === right.roomKey &&
+    left.deviceId === right.deviceId &&
+    left.token === right.token &&
+    left.name === right.name &&
+    left.role === right.role
+  );
 }

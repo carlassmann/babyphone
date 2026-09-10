@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from '@tanstack/react-router';
 import { ArrowLeft, ArrowRight, Bell, Headphones, Link, Mic, Moon, Smartphone } from 'lucide-react';
 import { InvitationScanner } from './InvitationScanner';
 import { request } from './connection';
-import { message } from './format';
+import { errorMessage } from './format';
 import type { Role, Session } from './protocol';
 export function Welcome({
   onJoin,
@@ -45,7 +45,7 @@ export function Welcome({
       });
       onJoin(session);
     } catch (error) {
-      setError(message(error));
+      setError(errorMessage(error));
     } finally {
       setBusy(false);
     }

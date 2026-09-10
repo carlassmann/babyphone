@@ -45,6 +45,20 @@ export type SocketSession = {
   count: number;
   window: number;
 };
+
+export type RequestBody = {
+  create: boolean;
+  deviceId: unknown;
+  name: unknown;
+  role: Role;
+  roomId: string;
+  roomKey: string;
+  roomName: unknown;
+  sensitivity: number;
+  subscription: unknown;
+  target: string;
+  token: unknown;
+};
 export type { Alert };
 export const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 export const key = () => Buffer.from(randomBytes(18)).toString('base64url');
@@ -81,7 +95,7 @@ export async function readBody(request: Request) {
   const value = JSON.parse(Buffer.concat(chunks).toString());
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new RequestError('Invalid request.');
-  return value;
+  return value as RequestBody;
 }
 export function failure(error: unknown) {
   if (!(error instanceof RequestError)) console.error('Request failed', String(error));

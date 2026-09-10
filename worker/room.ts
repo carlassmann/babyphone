@@ -5,6 +5,7 @@ import {
   type Device,
   type Alert,
   type Delivery,
+  type RequestBody,
   type SocketSession,
   key,
   hash,
@@ -15,6 +16,55 @@ import {
   failure,
 } from './shared';
 import { validSubscription, sendPush } from './push';
+
+const UNAUTHENTICATED_CONNECTION_LIMIT = 8;
+const AUTHENTICATION_TIMEOUT_MS = 5_000;
+const MESSAGE_WINDOW_MS = 10_000;
+const MESSAGE_LIMIT = 120;
+const MAX_MESSAGE_BYTES = 16_000;
+const NOISE_COOLDOWN_MS = 20_000;
+const EVENT_RETENTION_MS = 86_400_000;
+const DELIVERY_LIFETIME_MS = 60_000;
+const ICE_CACHE_MS = 300_000;
+
+function pushDeliveryError(status: number) {
+  if (status === 401 || status === 403) {
+    return new RequestError(
+      'Push server authentication failed. Check the server VAPID keys and contact URL.',
+      502,
+    );
+  }
+  if (status === 404 || status === 410) {
+    return new RequestError(
+      'This notification subscription expired. Enable notifications again.',
+      502,
+    );
+  }
+  return new RequestError('The push service is temporarily unavailable. Try the test again.', 502);
+}
+
+function alertPayload(event: Alert) {
+  const copy = {
+    noise: {
+      title: 'A little sound',
+      detail: ' detected sustained noise.',
+    },
+    paused: {
+      title: 'Monitoring paused',
+      detail: ' stopped monitoring.',
+    },
+    offline: {
+      title: 'Check your baby device',
+      detail: ' lost its connection. Check on your baby.',
+    },
+  } satisfies Record<Alert['kind'], { title: string; detail: string }>;
+
+  return {
+    title: copy[event.kind].title,
+    body: event.name + copy[event.kind].detail,
+    tag: event.id,
+  };
+}
 
 export class Room extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -56,74 +106,11 @@ export class Room extends DurableObject<Env> {
     try {
       const path = new URL(request.url).pathname;
       if (path === '/api/ws') {
-        if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')
-          throw new RequestError('WebSocket required');
-        if (!this.get('room', 'name')) throw new RequestError('Room not found', 404);
-        if (
-          this.ctx
-            .getWebSockets()
-            .filter((socket) => !(socket.deserializeAttachment() as SocketSession).deviceId)
-            .length >= 8
-        )
-          throw new RequestError('Too many connections', 429);
-        const pair = new WebSocketPair();
-        const [client, server] = Object.values(pair);
-        this.ctx.acceptWebSocket(server);
-        server.serializeAttachment({
-          connectedAt: Date.now(),
-          lastMessageAt: Date.now(),
-          revoked: false,
-          count: 0,
-          window: Date.now(),
-        } satisfies SocketSession);
-        await this.schedule();
-        return new Response(null, { status: 101, webSocket: client });
+        return await this.openWebSocket(request);
       }
       const body = await readBody(request);
       if (path === '/api/register') {
-        if (!['baby', 'parent'].includes(body.role))
-          throw new RequestError('Choose a device role.');
-        const name = cleanName(body.name);
-        let roomName = this.get<string>('room', 'name');
-        if (!roomName && !body.create)
-          throw new RequestError('Room not found. Check your invitation code.', 404);
-        const invitation = this.get<string>('room', 'invitation');
-        const validLegacyInvitation =
-          typeof body.roomKey === 'string' &&
-          !body.roomKey.includes('.') &&
-          this.env.ROOMS.idFromName('room:' + hash(body.roomKey)).toString() ===
-            this.ctx.id.toString();
-        if (invitation ? invitation !== body.roomKey : !validLegacyInvitation)
-          throw new RequestError('Invitation expired. Ask for a new link.', 403);
-        const token = key();
-        const device: Device = {
-          id: key(),
-          tokenHash: hash(token),
-          name,
-          role: body.role,
-          lastSeen: 0,
-          monitoring: false,
-          level: 0,
-          lastNoise: 0,
-        };
-        this.ctx.storage.transactionSync(() => {
-          if (!roomName) {
-            roomName = cleanName(body.roomName || 'Our little nest');
-            this.put('room', 'name', roomName);
-          }
-          if (!invitation) this.put('room', 'invitation', body.roomKey);
-          this.put('device', device.id, device);
-        });
-        this.broadcast();
-        return json({
-          roomId: this.ctx.id.toString(),
-          roomName,
-          roomKey: body.roomKey,
-          token,
-          deviceId: device.id,
-          name,
-          role: device.role,
-        });
+        return this.register(body);
       }
       const device = this.authenticate(body.deviceId, body.token);
       if (path === '/api/state') return json(this.state());
@@ -150,9 +137,7 @@ export class Room extends DurableObject<Env> {
           device.offlineNotified = true;
           device.subscription = undefined;
           this.put('device', device.id, device);
-          this.remove('ice', device.id);
-          for (const job of this.all<Delivery>('delivery'))
-            if (job.deviceId === device.id) this.remove('delivery', job.id);
+          this.removeDeviceResources(device.id);
         });
         this.closeDevice(device.id, 4008, 'Room inactive');
         await this.schedule();
@@ -172,9 +157,7 @@ export class Room extends DurableObject<Env> {
           this.put('room', 'invitation', roomKey);
           if (target) {
             this.remove('device', target.id);
-            this.remove('ice', target.id);
-            for (const job of this.all<Delivery>('delivery'))
-              if (job.deviceId === target.id) this.remove('delivery', job.id);
+            this.removeDeviceResources(target.id);
           }
         });
         if (target) this.closeDevice(target.id, 4001, 'Access removed');
@@ -224,15 +207,7 @@ export class Room extends DurableObject<Env> {
           body: 'Your test notification arrived. Try this again with Pip in the background.',
           tag: 'pip-test',
         });
-        if (status < 200 || status >= 300)
-          throw new RequestError(
-            status === 401 || status === 403
-              ? 'Push server authentication failed. Check the server VAPID keys and contact URL.'
-              : status === 404 || status === 410
-                ? 'This notification subscription expired. Enable notifications again.'
-                : 'The push service is temporarily unavailable. Try the test again.',
-            502,
-          );
+        if (status < 200 || status >= 300) throw pushDeliveryError(status);
         return json({ ok: true });
       }
       if (path === '/api/role' || path === '/api/leave') {
@@ -243,9 +218,7 @@ export class Room extends DurableObject<Env> {
           if (path === '/api/leave') this.remove('device', device.id);
           else
             this.put('device', device.id, { ...device, role: body.role, subscription: undefined });
-          this.remove('ice', device.id);
-          for (const job of this.all<Delivery>('delivery'))
-            if (job.deviceId === device.id) this.remove('delivery', job.id);
+          this.removeDeviceResources(device.id);
         });
         this.closeDevice(device.id, 4000, 'Device changed');
         await this.schedule();
@@ -257,6 +230,85 @@ export class Room extends DurableObject<Env> {
       return failure(error);
     }
   }
+
+  private async openWebSocket(request: Request) {
+    if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
+      throw new RequestError('WebSocket required');
+    }
+    if (!this.get('room', 'name')) throw new RequestError('Room not found', 404);
+
+    const unauthenticatedConnections = this.ctx
+      .getWebSockets()
+      .filter((socket) => !(socket.deserializeAttachment() as SocketSession).deviceId);
+    if (unauthenticatedConnections.length >= UNAUTHENTICATED_CONNECTION_LIMIT) {
+      throw new RequestError('Too many connections', 429);
+    }
+
+    const [client, server] = Object.values(new WebSocketPair());
+    const now = Date.now();
+    this.ctx.acceptWebSocket(server);
+    server.serializeAttachment({
+      connectedAt: now,
+      lastMessageAt: now,
+      revoked: false,
+      count: 0,
+      window: now,
+    } satisfies SocketSession);
+    await this.schedule();
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  private register(body: RequestBody) {
+    if (!['baby', 'parent'].includes(body.role)) {
+      throw new RequestError('Choose a device role.');
+    }
+
+    const name = cleanName(body.name);
+    let roomName = this.get<string>('room', 'name');
+    if (!roomName && !body.create) {
+      throw new RequestError('Room not found. Check your invitation code.', 404);
+    }
+
+    const invitation = this.get<string>('room', 'invitation');
+    const validLegacyInvitation =
+      typeof body.roomKey === 'string' &&
+      !body.roomKey.includes('.') &&
+      this.env.ROOMS.idFromName('room:' + hash(body.roomKey)).toString() === this.ctx.id.toString();
+    if (invitation ? invitation !== body.roomKey : !validLegacyInvitation) {
+      throw new RequestError('Invitation expired. Ask for a new link.', 403);
+    }
+
+    const token = key();
+    const device: Device = {
+      id: key(),
+      tokenHash: hash(token),
+      name,
+      role: body.role,
+      lastSeen: 0,
+      monitoring: false,
+      level: 0,
+      lastNoise: 0,
+    };
+    this.ctx.storage.transactionSync(() => {
+      if (!roomName) {
+        roomName = cleanName(body.roomName || 'Our little nest');
+        this.put('room', 'name', roomName);
+      }
+      if (!invitation) this.put('room', 'invitation', body.roomKey);
+      this.put('device', device.id, device);
+    });
+    this.broadcast();
+
+    return json({
+      roomId: this.ctx.id.toString(),
+      roomName,
+      roomKey: body.roomKey,
+      token,
+      deviceId: device.id,
+      name,
+      role: device.role,
+    });
+  }
   private heartbeat(device: Device, monitoring: boolean, level: number) {
     const wasActive = device.monitoring;
     device.monitoring = device.role === 'baby' && monitoring;
@@ -267,12 +319,19 @@ export class Room extends DurableObject<Env> {
     this.put('device', device.id, device);
     if (wasActive && !device.monitoring) this.alert(device, 'paused');
   }
+
+  private removeDeviceResources(deviceId: string) {
+    this.remove('ice', deviceId);
+    for (const delivery of this.all<Delivery>('delivery')) {
+      if (delivery.deviceId === deviceId) this.remove('delivery', delivery.id);
+    }
+  }
   private alert(device: Device, kind: Alert['kind']) {
     const now = Date.now();
     if (kind === 'noise') {
       if (device.role !== 'baby' || !device.monitoring || now - device.lastSeen > OFFLINE_MS)
         throw new RequestError('Start monitoring before sending an alert.');
-      if (now - device.lastNoise < 20000) return;
+      if (now - device.lastNoise < NOISE_COOLDOWN_MS) return;
       device.lastNoise = now;
       this.put('device', device.id, device);
     }
@@ -282,22 +341,7 @@ export class Room extends DurableObject<Env> {
       .sort((a, b) => b.at - a.at)
       .slice(30))
       this.remove('event', old.id);
-    const payload = {
-      title:
-        kind === 'noise'
-          ? 'A little sound'
-          : kind === 'paused'
-            ? 'Monitoring paused'
-            : 'Check your baby device',
-      body:
-        device.name +
-        (kind === 'noise'
-          ? ' detected sustained noise.'
-          : kind === 'paused'
-            ? ' stopped monitoring.'
-            : ' lost its connection. Check on your baby.'),
-      tag: event.id,
-    };
+    const payload = alertPayload(event);
     for (const parent of this.all<Device>('device')) {
       if (parent.role !== 'parent' || !parent.subscription) continue;
       const id = event.id + ':' + parent.id;
@@ -306,7 +350,7 @@ export class Room extends DurableObject<Env> {
         deviceId: parent.id,
         subscription: parent.subscription,
         payload,
-        expires: now + 60000,
+        expires: now + DELIVERY_LIFETIME_MS,
         nextAt: now,
         attempts: 0,
       } satisfies Delivery);
@@ -333,7 +377,7 @@ export class Room extends DurableObject<Env> {
         }),
       ),
       events: this.all<Alert>('event')
-        .filter((event) => now - event.at < 86400000)
+        .filter((event) => now - event.at < EVENT_RETENTION_MS)
         .sort((a, b) => b.at - a.at),
     };
   }
@@ -370,19 +414,22 @@ export class Room extends DurableObject<Env> {
       const session = socket.deserializeAttachment() as SocketSession;
       if (session.revoked) return;
       const now = Date.now();
-      if (now - session.lastMessageAt > (session.deviceId ? OFFLINE_MS : 5000)) {
+      if (
+        now - session.lastMessageAt >
+        (session.deviceId ? OFFLINE_MS : AUTHENTICATION_TIMEOUT_MS)
+      ) {
         this.close(socket, 1008, 'Heartbeat expired');
         return;
       }
-      if (typeof raw !== 'string' || raw.length > 16000) {
+      if (typeof raw !== 'string' || raw.length > MAX_MESSAGE_BYTES) {
         this.close(socket, 1009, 'Message too large');
         return;
       }
-      if (now - session.window > 10000) {
+      if (now - session.window > MESSAGE_WINDOW_MS) {
         session.count = 0;
         session.window = now;
       }
-      if (++session.count > 120) {
+      if (++session.count > MESSAGE_LIMIT) {
         this.close(socket, 1008, 'Too many messages');
         return;
       }
@@ -466,15 +513,20 @@ export class Room extends DurableObject<Env> {
   private async schedule() {
     const due = [
       ...this.all<Device>('device')
-        .filter((d) => d.role === 'baby' && d.lastSeen > 0 && !d.offlineNotified)
-        .map((d) => d.lastSeen + OFFLINE_MS + 1),
-      ...this.all<Delivery>('delivery').map((d) => d.nextAt),
-      ...this.all<Alert>('event').map((e) => e.at + 86400000),
+        .filter(
+          (device) => device.role === 'baby' && device.lastSeen > 0 && !device.offlineNotified,
+        )
+        .map((device) => device.lastSeen + OFFLINE_MS + 1),
+      ...this.all<Delivery>('delivery').map((delivery) => delivery.nextAt),
+      ...this.all<Alert>('event').map((event) => event.at + EVENT_RETENTION_MS),
       ...this.ctx
         .getWebSockets()
         .map((socket) => socket.deserializeAttachment() as SocketSession)
-        .filter((s) => !s.revoked)
-        .map((s) => s.lastMessageAt + (s.deviceId ? OFFLINE_MS : 5000) + 1),
+        .filter((session) => !session.revoked)
+        .map(
+          (session) =>
+            session.lastMessageAt + (session.deviceId ? OFFLINE_MS : AUTHENTICATION_TIMEOUT_MS) + 1,
+        ),
     ];
     if (!due.length) {
       await this.ctx.storage.deleteAlarm();
@@ -502,11 +554,11 @@ export class Room extends DurableObject<Env> {
         }
       }
       for (const event of this.all<Alert>('event'))
-        if (now - event.at >= 86400000) this.remove('event', event.id);
+        if (now - event.at >= EVENT_RETENTION_MS) this.remove('event', event.id);
     });
     for (const socket of this.ctx.getWebSockets()) {
       const session = socket.deserializeAttachment() as SocketSession;
-      if (now - session.lastMessageAt > (session.deviceId ? OFFLINE_MS : 5000))
+      if (now - session.lastMessageAt > (session.deviceId ? OFFLINE_MS : AUTHENTICATION_TIMEOUT_MS))
         this.close(socket, 1008, 'Heartbeat expired');
     }
     this.broadcast();
@@ -559,7 +611,7 @@ export class Room extends DurableObject<Env> {
     if (!this.env.TURN_KEY_ID || !this.env.TURN_KEY_API_TOKEN)
       return { iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }] };
     const cached = this.get<{ at: number; iceServers: RTCIceServer[] }>('ice', deviceId);
-    if (cached && Date.now() - cached.at < 300000) return { iceServers: cached.iceServers };
+    if (cached && Date.now() - cached.at < ICE_CACHE_MS) return { iceServers: cached.iceServers };
     const response = await fetch(
       'https://rtc.live.cloudflare.com/v1/turn/keys/' +
         encodeURIComponent(this.env.TURN_KEY_ID) +

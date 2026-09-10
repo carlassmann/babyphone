@@ -1,5 +1,5 @@
 import { createRootRoute, createRoute, createRouter, Link, redirect } from '@tanstack/react-router';
-import { MonitorPage, ActivityPage, SettingsPage } from './Room';
+import { ActivityScreen, MonitorScreen, SettingsScreen } from './features/room';
 import { App, AppScreen, LandingScreen } from './App';
 import { readSession } from './sessions';
 
@@ -35,19 +35,19 @@ const app = createRoute({
       throw redirect({ to: '/app', replace: true });
   },
 });
-const appIndex = createRoute({ getParentRoute: () => app, path: '/', component: MonitorPage });
+const appIndex = createRoute({ getParentRoute: () => app, path: '/', component: MonitorScreen });
 const activity = createRoute({
   getParentRoute: () => app,
   path: 'activity',
-  component: ActivityPage,
+  component: ActivityScreen,
 });
 const settings = createRoute({
   getParentRoute: () => app,
   path: 'settings',
-  component: SettingsPage,
+  component: SettingsScreen,
 });
-const create = createRoute({ getParentRoute: () => app, path: 'create', component: MonitorPage });
-const join = createRoute({ getParentRoute: () => app, path: 'join', component: MonitorPage });
+const create = createRoute({ getParentRoute: () => app, path: 'create', component: MonitorScreen });
+const join = createRoute({ getParentRoute: () => app, path: 'join', component: MonitorScreen });
 
 export const router = createRouter({
   routeTree: root.addChildren([

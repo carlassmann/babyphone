@@ -3,6 +3,11 @@ import { toast } from 'sonner';
 import { request } from './connection';
 import type { Session } from './protocol';
 type InstallPrompt = Event & { prompt(): Promise<void>; userChoice: Promise<{ outcome: string }> };
+
+const SERVICE_WORKER_READY_TIMEOUT_MS = 8_000;
+const PUSH_CONFIG_TIMEOUT_MS = 8_000;
+const PUSH_SUBSCRIPTION_TIMEOUT_MS = 12_000;
+
 export function usePwa() {
   const [prompt, setPrompt] = useState<InstallPrompt>();
   const [waiting, setWaiting] = useState<ServiceWorker>();
@@ -26,9 +31,7 @@ export function usePwa() {
     toast('Pip update available', {
       id: 'pip-update',
       duration: Infinity,
-      description: updateBlocked
-        ? 'Pause monitoring and listening before updating.'
-        : undefined,
+      description: updateBlocked ? 'Pause monitoring and listening before updating.' : undefined,
       action: updateBlocked ? undefined : { label: 'Update', onClick: update },
     });
     return () => {
@@ -108,11 +111,13 @@ export async function enableNotifications(session: Session) {
     new Promise<never>((_, reject) =>
       setTimeout(
         () => reject(new Error('Installation is still getting ready. Reload and try again.')),
-        8000,
+        SERVICE_WORKER_READY_TIMEOUT_MS,
       ),
     ),
   ]);
-  const response = await fetch('/api/config', { signal: AbortSignal.timeout(8000) });
+  const response = await fetch('/api/config', {
+    signal: AbortSignal.timeout(PUSH_CONFIG_TIMEOUT_MS),
+  });
   const { pushKey } = await response.json();
   if (!pushKey) throw new Error('Push notifications are not configured on this server.');
   const existing = await registration.pushManager.getSubscription();
@@ -130,7 +135,7 @@ export async function enableNotifications(session: Session) {
       ? existing
       : await withTimeout(
           registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }),
-          12000,
+          PUSH_SUBSCRIPTION_TIMEOUT_MS,
         );
   await request('subscription', { ...session, subscription: subscription.toJSON() });
 }

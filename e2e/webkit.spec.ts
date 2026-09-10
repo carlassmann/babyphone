@@ -34,6 +34,16 @@ test('WebKit mobile setup, microphone start, saved role, and narrow layout', asy
   await page.getByRole('button', { name: 'Pause monitoring' }).click();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Start monitoring' })).toBeVisible();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  const lastSetting = page.getByRole('button', { name: 'Privacy' });
+  await lastSetting.scrollIntoViewIfNeeded();
+  const settingBottom = await lastSetting.evaluate(
+    (element) => element.getBoundingClientRect().bottom,
+  );
+  const navigationTop = await page
+    .locator('.room-navigation')
+    .evaluate((element) => element.getBoundingClientRect().top);
+  expect(settingBottom).toBeLessThan(navigationTop);
   await page.screenshot({ path: 'artifacts/baby-webkit-mobile.png', fullPage: true });
   await context.close();
 });
