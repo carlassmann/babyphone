@@ -1,4 +1,10 @@
-export const SENSITIVITY_THRESHOLDS = [0.012, 0.003, 0.001] as const;
+export const SENSITIVITY_THRESHOLDS = [0.004, 0.00075, 0.00015] as const;
+
+export function meterFraction(level: number) {
+  if (level <= 0) return 0;
+  const decibels = 20 * Math.log10(level);
+  return Math.max(0, Math.min(1, (decibels + 80) / 60));
+}
 
 export class LevelHold {
   private level = 0;
@@ -23,7 +29,7 @@ export class NoiseDetector {
     public threshold: number = SENSITIVITY_THRESHOLDS[1],
     private sustain = 1500,
     private cooldown = 20000,
-    private release = 300,
+    private release = 500,
   ) {}
   sample(rms: number, now: number) {
     if (rms < this.threshold) {

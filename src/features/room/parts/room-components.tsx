@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { errorMessage } from '../../../format';
+import { meterFraction } from '../../../noise';
 
 const METER_BAR_COUNT = 36;
-const METER_SCALE = 144;
-const METER_PERCENT_SCALE = 400;
 
 export function AudioMeter({ value }: { value: number }) {
+  const fraction = meterFraction(value);
   return (
     <div
       className="meter"
@@ -13,12 +13,12 @@ export function AudioMeter({ value }: { value: number }) {
       aria-label="Audio level"
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-valuenow={Math.round(Math.min(value * METER_PERCENT_SCALE, 100))}
+      aria-valuenow={Math.round(fraction * 100)}
     >
       {Array.from({ length: METER_BAR_COUNT }, (_, index) => (
         <span
           key={index}
-          className={index < value * METER_SCALE ? 'lit' : ''}
+          className={index < fraction * METER_BAR_COUNT ? 'lit' : ''}
           style={{ height: `${10 + Math.sin(index * 0.65) ** 2 * 17}px` }}
         />
       ))}
