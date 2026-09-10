@@ -17,6 +17,7 @@ import {
 import { DeviceSettingsModal, InvitationModal } from './parts/room-modals';
 import { RoomProvider } from './room-context';
 import { SENSITIVITY_THRESHOLDS } from '../../noise';
+import { recentEvent } from './lib/recent-event';
 
 const AUDIO_ACTIVE_STATUSES = [
   'Listening live',
@@ -55,7 +56,7 @@ export function Room({
   );
   const [push, setPush] = useState(false);
   const [pushTest, setPushTest] = useState('');
-  const [dismissedEvent, setDismissedEvent] = useState('');
+  const [dismissedEventsThrough, setDismissedEventsThrough] = useState(0);
   const [sensitivity, setSensitivity] = useState(2);
   const [dim, setDim] = useState(() => localStorage.getItem('pip-dim') === 'true');
   useEffect(() => {
@@ -316,9 +317,7 @@ export function Room({
   function resumeAudio(deviceId: string) {
     void callsRef.current?.resume(deviceId).catch((error) => setError(errorMessage(error)));
   }
-  const latestEvent = events.find(
-    (event) => event.id !== dismissedEvent && Date.now() - event.at < RECENT_EVENT_MS,
-  );
+  const latestEvent = recentEvent(events, dismissedEventsThrough, Date.now(), RECENT_EVENT_MS);
   const babies = devices.filter((device) => device.role === 'baby');
   const parents = devices.filter((device) => device.role === 'parent' && device.online);
   return (
@@ -346,7 +345,10 @@ export function Room({
         {!connected && <ConnectionNotice connection={connection} />}
         {error && <ErrorNotice error={error} onDismiss={() => setError('')} />}
         {!isBaby && latestEvent && (
-          <EventNotice event={latestEvent} onDismiss={() => setDismissedEvent(latestEvent.id)} />
+          <EventNotice
+            event={latestEvent}
+            onDismiss={() => setDismissedEventsThrough(latestEvent.at)}
+          />
         )}
         <RoomProvider
           value={{

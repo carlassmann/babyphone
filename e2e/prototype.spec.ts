@@ -171,6 +171,8 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
     .toBeGreaterThan(playingAt + 0.2);
   await expect(parent.getByText('A little sound', { exact: true })).toBeVisible({ timeout: 30000 });
   await expect(second.getByText('A little sound', { exact: true })).toBeVisible();
+  await parent.getByRole('button', { name: 'Dismiss notification' }).click();
+  await expect(parent.getByText('Noise detected', { exact: true })).toHaveCount(0);
   await baby.screenshot({ path: 'artifacts/baby-mobile.png', fullPage: true });
   await parent.screenshot({ path: 'artifacts/parent-desktop.png', fullPage: true });
   await babyContext.setOffline(true);
