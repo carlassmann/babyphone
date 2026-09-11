@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
-import { AudioLines, Headphones, Plus, Settings } from 'lucide-react';
+import { AddIcon, ParentIcon, SettingsIcon, SoundIcon } from '../../../icons';
 
 const ROOM_NAVIGATION = [
-  ['/app', 'Monitor', Headphones],
-  ['/app/activity', 'Activity', AudioLines],
-  ['/app/settings', 'Settings', Settings],
+  ['/app', 'Monitor', ParentIcon],
+  ['/app/activity', 'Activity', SoundIcon],
+  ['/app/settings', 'Settings', SettingsIcon],
 ] as const;
 
 export function RoomHeader({
@@ -38,7 +38,7 @@ export function RoomHeader({
           aria-label="Invite device"
           onClick={onInvite}
         >
-          <Plus size={17} />
+          <AddIcon size={18} weight="bold" />
           <span className="invite-device-label">Invite device</span>
         </button>
       </div>

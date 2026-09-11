@@ -1,6 +1,15 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from '@tanstack/react-router';
-import { ArrowLeft, ArrowRight, Bell, Headphones, Link, Mic, Moon, Smartphone } from 'lucide-react';
+import {
+  AlertIcon,
+  BabyIcon,
+  BackIcon,
+  DeviceIcon,
+  ForwardIcon,
+  InviteLinkIcon,
+  MicrophoneIcon,
+  ParentIcon,
+} from './icons';
 import { InvitationScanner } from './InvitationScanner';
 import { PipMascot } from './PipMascot';
 import { request } from './connection';
@@ -99,33 +108,33 @@ export function Welcome({
                 className="primary"
                 onClick={() => void navigate({ to: '/app/create' })}
               >
-                Create a room <ArrowRight size={18} />
+                Create a room <ForwardIcon size={18} />
               </button>
               <button
                 type="button"
                 className="secondary"
                 onClick={() => void navigate({ to: '/app/join' })}
               >
-                Join a room <Link size={18} />
+                Join a room <InviteLinkIcon size={18} />
               </button>
             </div>
             {!appMode && (
               <div className="steps">
                 <span>
                   <span className="step-icon">
-                    <Smartphone size={18} />
+                    <DeviceIcon size={18} />
                   </span>
                   Two or more devices
                 </span>
                 <span>
                   <span className="step-icon">
-                    <Mic size={18} />
+                    <MicrophoneIcon size={18} />
                   </span>
                   Live audio
                 </span>
                 <span>
                   <span className="step-icon">
-                    <Bell size={18} />
+                    <AlertIcon size={18} />
                   </span>
                   Gentle alerts
                 </span>
@@ -139,7 +148,7 @@ export function Welcome({
               className="back quiet"
               onClick={() => void navigate({ to: '/app', hash: '', search: {} })}
             >
-              <ArrowLeft size={16} /> Back
+              <BackIcon size={16} /> Back
             </button>
             <h2>{mode === 'join' ? 'Join a room' : 'Create a room'}</h2>
             <p>
@@ -188,7 +197,7 @@ export function Welcome({
                   aria-pressed={role === 'baby'}
                   onClick={() => setRole('baby')}
                 >
-                  <Moon />
+                  <BabyIcon size={24} />
                   <strong>Baby</strong>
                   <span>Listen for little sounds</span>
                 </button>
@@ -197,7 +206,7 @@ export function Welcome({
                   aria-pressed={role === 'parent'}
                   onClick={() => setRole('parent')}
                 >
-                  <Headphones />
+                  <ParentIcon size={24} />
                   <strong>Me</strong>
                   <span>Keep an ear out</span>
                 </button>
@@ -223,7 +232,7 @@ export function Welcome({
               disabled={busy || (mode === 'join' && !roomKey.trim())}
             >
               {busy ? 'Getting your room ready…' : mode === 'join' ? 'Join room' : 'Create room'}
-              <ArrowRight size={18} />
+              <ForwardIcon size={18} />
             </button>
           </form>
         )}

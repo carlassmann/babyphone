@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { X } from 'lucide-react';
+import { CloseIcon } from './icons';
 export function Modal({
   title,
   close,
@@ -34,7 +34,7 @@ export function Modal({
           onClick={close}
           aria-label="Close dialog"
         >
-          <X size={19} />
+          <CloseIcon size={19} />
         </button>
         <h2>{title}</h2>
         {children}

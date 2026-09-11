@@ -1,4 +1,11 @@
-import { ArrowRight, Check, ChevronRight, Copy, Link, Smartphone } from 'lucide-react';
+import {
+  CheckIcon,
+  CopyIcon,
+  DeviceIcon,
+  DisclosureIcon,
+  ForwardIcon,
+  InviteLinkIcon,
+} from '../../../icons';
 import { request } from '../../../connection';
 import { InvitationQr } from '../../../InvitationQr';
 import { Modal } from '../../../Modal';
@@ -47,11 +54,11 @@ export function InvitationModal({
           className="primary full"
           onClick={() => onCopy(`${location.origin}/app/join#join=${invitation}`, 'link')}
         >
-          {copied === 'link' ? <Check size={17} /> : <Link size={17} />}{' '}
+          {copied === 'link' ? <CheckIcon size={18} weight="bold" /> : <InviteLinkIcon size={18} />}{' '}
           {copied === 'link' ? 'Link copied' : 'Copy invite link'}
         </button>
         <button type="button" className="secondary full" onClick={() => onCopy(invitation, 'code')}>
-          <Copy size={16} />
+          <CopyIcon size={17} />
           {copied === 'code' ? 'Code copied' : 'Copy code'}
         </button>
       </div>
@@ -102,7 +109,7 @@ export function DeviceSettingsModal({
   return (
     <Modal title="Device settings" close={onClose}>
       <div className="setting-detail">
-        <Smartphone />
+        <DeviceIcon size={24} />
         <div>
           <strong>{session.name}</strong>
           <p>{isBaby ? 'Baby device' : 'Parent device'}</p>
@@ -115,7 +122,7 @@ export function DeviceSettingsModal({
       />
       <button type="button" className="secondary full" disabled={busy} onClick={onChangeRole}>
         Switch to {isBaby ? 'parent' : 'baby'} device
-        <ChevronRight size={17} />
+        <DisclosureIcon size={17} />
       </button>
       <p className="caption">Switching roles pauses monitoring and stops live audio.</p>
       {!isBaby && (
@@ -161,7 +168,7 @@ export function DeviceSettingsModal({
       )}
       <hr />
       <button type="button" className="quiet danger" disabled={busy} onClick={onLeave}>
-        Leave this room <ArrowRight size={16} />
+        Leave this room <ForwardIcon size={16} />
       </button>
       <p className="caption">You’ll need the invitation code to join again.</p>
     </Modal>

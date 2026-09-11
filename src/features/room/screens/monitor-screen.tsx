@@ -1,13 +1,13 @@
 import {
-  ArrowRight,
-  AudioLines,
-  Headphones,
-  Mic,
-  Moon,
-  Pause,
-  Sun,
-  SunDim,
-} from 'lucide-react';
+  BabyIcon,
+  BrightIcon,
+  DimIcon,
+  ForwardIcon,
+  MicrophoneIcon,
+  ParentIcon,
+  PauseIcon,
+  SoundIcon,
+} from '../../../icons';
 import { relativeTime } from '../../../format';
 import { AudioMeter } from '../parts/room-components';
 import { useRoom } from '../room-context';
@@ -69,20 +69,24 @@ function BabyMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
         disabled={room.busy || (!room.active && !room.connected)}
         onClick={() => void room.toggleMonitoring()}
       >
-        {room.active ? <Pause size={19} /> : <Mic size={19} />}{' '}
+        {room.active ? (
+          <PauseIcon size={19} weight="fill" />
+        ) : (
+          <MicrophoneIcon size={19} weight="fill" />
+        )}{' '}
         {room.busy ? 'Opening microphone…' : room.active ? 'Pause monitoring' : 'Start monitoring'}
       </button>
       <div className="baby-checks">
         <span>
-          <Mic size={15} />
+          <MicrophoneIcon size={16} />
           {room.active ? 'Microphone on' : 'Microphone off'}
         </span>
         <span>
-          <Sun size={15} />
+          <BrightIcon size={16} />
           {room.awake ? 'Screen staying awake' : 'Screen wake lock off'}
         </span>
         <span>
-          <Headphones size={15} />
+          <ParentIcon size={16} />
           {room.parents.length} parent {room.parents.length === 1 ? 'device' : 'devices'} online
         </span>
       </div>
@@ -110,7 +114,7 @@ function DimControl({ room }: { room: ReturnType<typeof useRoom> }) {
       title={room.dimmed ? 'Restore screen brightness' : 'Reduce screen brightness'}
       onClick={room.toggleDim}
     >
-      {room.dimmed ? <Sun size={18} /> : <SunDim size={18} />}
+      {room.dimmed ? <BrightIcon size={18} /> : <DimIcon size={18} />}
       {room.dimmed ? 'Restore brightness' : 'Dim screen'}
     </button>
   );
@@ -132,7 +136,7 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
           Open the invitation on the phone that stays in the nursery.
         </p>
         <button type="button" className="primary" onClick={room.openInvitation}>
-          Invite a baby device <ArrowRight size={18} />
+          Invite a baby device <ForwardIcon size={18} />
         </button>
       </div>
     );
@@ -146,7 +150,7 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
         <article className="device-card" key={device.id}>
           <div className="device-heading">
             <div className="device-icon">
-              <Moon size={25} />
+              <BabyIcon size={26} />
             </div>
             <div>
               <h3>{device.name}</h3>
@@ -182,7 +186,7 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
                 className="secondary small"
                 onClick={() => room.stopListening(device.id)}
               >
-                <Pause size={16} /> Stop listening
+                <PauseIcon size={17} weight="fill" /> Stop listening
               </button>
             ) : (
               <button
@@ -191,13 +195,13 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
                 disabled={!room.connected || !device.monitoring}
                 onClick={() => room.listenTo(device.id)}
               >
-                <Headphones size={17} /> Listen
+                <ParentIcon size={18} /> Listen
               </button>
             )}
           </div>
           {room.audioStatuses[device.id] && (
             <div className="audio-status" role="status">
-              <AudioLines size={16} />
+              <SoundIcon size={17} />
               {room.audioStatuses[device.id]}
               {room.audioStatuses[device.id]?.includes('Resume') && (
                 <button type="button" onClick={() => room.resumeAudio(device.id)}>

@@ -1,5 +1,6 @@
 .monitor-mascot {
   position: relative;
+  display: flex;
   width: 230px;
   height: 190px;
   margin: 0 auto -14px;

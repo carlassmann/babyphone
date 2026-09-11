@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { Check, ChevronDown } from 'lucide-react';
+import { CheckIcon, ExpandIcon } from './icons';
 import type { Session } from './protocol';
 import { Modal } from './Modal';
 
@@ -90,7 +90,7 @@ export function RoomsPopover({
           <span>
             {rooms.find((room) => room.deviceId === activeDeviceId)?.roomName || 'Saved rooms'}
           </span>
-          <ChevronDown size={18} />
+          <ExpandIcon size={18} />
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -118,7 +118,7 @@ export function RoomsPopover({
                       {room.name} · {room.role === 'baby' ? 'Baby' : 'Parent'}
                     </small>
                   </span>
-                  {room.deviceId === activeDeviceId && <Check size={18} />}
+                  {room.deviceId === activeDeviceId && <CheckIcon size={18} weight="bold" />}
                 </button>
                 {room.deviceId !== activeDeviceId && (
                   <button

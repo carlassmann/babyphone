@@ -1,4 +1,4 @@
-import { ArrowRight, Bell, Check, Smartphone } from 'lucide-react';
+import { AlertIcon, CheckIcon, DeviceIcon, ForwardIcon } from '../../../icons';
 import { request } from '../../../connection';
 import { RenameField } from '../parts/room-components';
 import { useRoom } from '../room-context';
@@ -20,13 +20,13 @@ export function SettingsScreen() {
       )}
       <section className="side-card connection-card">
         <div className="section-icon">
-          <Bell size={21} />
+          <AlertIcon size={22} />
         </div>
         <h3>{room.isBaby ? 'Device setup' : 'Notifications'}</h3>
         {room.isBaby ? <BabySetup /> : <NotificationSetup room={room} />}
       </section>
       <button type="button" className="secondary full" onClick={room.openSettings}>
-        <Smartphone size={18} /> Manage this device
+        <DeviceIcon size={19} /> Manage this device
       </button>
       {room.preferences}
     </>
@@ -38,13 +38,13 @@ function BabySetup() {
     <>
       <p>Keep this device plugged in, with Pip open in the foreground.</p>
       <div className="check-row">
-        <Check size={16} /> Volume is analyzed here
+        <CheckIcon size={17} weight="bold" /> Volume is analyzed here
       </div>
       <div className="check-row">
-        <Check size={16} /> No audio is saved
+        <CheckIcon size={17} weight="bold" /> No audio is saved
       </div>
       <div className="check-row">
-        <Check size={16} /> Parents can listen anytime
+        <CheckIcon size={17} weight="bold" /> Parents can listen anytime
       </div>
     </>
   );
@@ -63,7 +63,7 @@ function NotificationSetup({ room }: { room: ReturnType<typeof useRoom> }) {
         disabled={room.busy || room.pushEnabled || !room.connected}
         onClick={() => void room.enableNotifications()}
       >
-        {room.pushEnabled ? <Check size={16} /> : <Bell size={16} />}{' '}
+        {room.pushEnabled ? <CheckIcon size={17} weight="bold" /> : <AlertIcon size={17} />}{' '}
         {room.pushEnabled ? 'Notifications enabled' : 'Enable notifications'}
       </button>
       {room.pushEnabled && (
@@ -73,7 +73,7 @@ function NotificationSetup({ room }: { room: ReturnType<typeof useRoom> }) {
           disabled={room.busy}
           onClick={() => void room.testNotification()}
         >
-          Test notification <ArrowRight size={15} />
+          Test notification <ForwardIcon size={16} />
         </button>
       )}
       {room.pushTestMessage && (

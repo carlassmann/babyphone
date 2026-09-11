@@ -1,4 +1,4 @@
-import { Bell, Sun, Wifi, X } from 'lucide-react';
+import { AlertActiveIcon, BrightIcon, CloseIcon, ConnectionIcon } from '../../../icons';
 import type { ConnectionStatus } from '../../../connection';
 import type { Alert } from '../../../protocol';
 
@@ -22,7 +22,7 @@ export function ConnectionSummary({
       <span>{deviceName}</span>
       {parentAwake && (
         <span className="wake-status">
-          <Sun size={15} />
+          <BrightIcon size={16} />
           Screen staying awake
         </span>
       )}
@@ -40,7 +40,7 @@ export function ConnectionNotice({ connection }: { connection: ConnectionStatus 
 
   return (
     <p role="alert" className="notice">
-      <Wifi size={19} />
+      <ConnectionIcon size={20} />
       {message}
     </p>
   );
@@ -51,7 +51,7 @@ export function ErrorNotice({ error, onDismiss }: { error: string; onDismiss: ()
     <p role="alert" className="notice">
       <span>{error}</span>
       <button type="button" className="icon-button" aria-label="Dismiss error" onClick={onDismiss}>
-        <X size={16} />
+        <CloseIcon size={17} />
       </button>
     </p>
   );
@@ -73,7 +73,7 @@ export function EventNotice({ event, onDismiss }: { event: Alert; onDismiss: () 
 
   return (
     <div className={`notice ${event.kind === 'noise' ? 'sound-notice' : ''}`} role="alert">
-      <Bell size={19} />
+      <AlertActiveIcon size={20} />
       <span>
         <strong>{title}</strong>
         <br />
@@ -86,7 +86,7 @@ export function EventNotice({ event, onDismiss }: { event: Alert; onDismiss: () 
         aria-label="Dismiss notification"
         onClick={onDismiss}
       >
-        <X size={16} />
+        <CloseIcon size={17} />
       </button>
     </div>
   );
