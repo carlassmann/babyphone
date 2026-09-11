@@ -1,4 +1,13 @@
-import { ArrowRight, AudioLines, Headphones, Mic, Moon, Pause, Sun } from 'lucide-react';
+import {
+  ArrowRight,
+  AudioLines,
+  Headphones,
+  Mic,
+  Moon,
+  Pause,
+  Sun,
+  SunDim,
+} from 'lucide-react';
 import { relativeTime } from '../../../format';
 import { AudioMeter } from '../parts/room-components';
 import { useRoom } from '../room-context';
@@ -77,6 +86,7 @@ function BabyMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
           {room.parents.length} parent {room.parents.length === 1 ? 'device' : 'devices'} online
         </span>
       </div>
+      {room.active && <DimControl room={room} />}
       {room.active && !room.awake && (
         <p className="notice">
           Keep the screen awake manually. Automatic screen wake lock is unavailable.
@@ -88,6 +98,21 @@ function BabyMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
         onChange={(value) => void room.changeSensitivity(room.session.deviceId, value)}
       />
     </>
+  );
+}
+
+function DimControl({ room }: { room: ReturnType<typeof useRoom> }) {
+  return (
+    <button
+      type="button"
+      className="secondary small dim-control"
+      aria-pressed={room.dimmed}
+      title={room.dimmed ? 'Restore screen brightness' : 'Reduce screen brightness'}
+      onClick={room.toggleDim}
+    >
+      {room.dimmed ? <Sun size={18} /> : <SunDim size={18} />}
+      {room.dimmed ? 'Restore brightness' : 'Dim screen'}
+    </button>
   );
 }
 
@@ -112,6 +137,8 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
       </div>
     );
   }
+
+  const listening = room.babies.some((device) => isListening(room.audioStatuses[device.id]));
 
   return (
     <div className="device-list">
@@ -181,6 +208,7 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
           )}
         </article>
       ))}
+      {listening && <DimControl room={room} />}
     </div>
   );
 }

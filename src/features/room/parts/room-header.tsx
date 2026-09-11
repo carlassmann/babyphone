@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
-import { AudioLines, Headphones, Plus, Settings, Sun, SunDim } from 'lucide-react';
+import { AudioLines, Headphones, Plus, Settings } from 'lucide-react';
 
 const ROOM_NAVIGATION = [
   ['/app', 'Monitor', Headphones],
@@ -9,17 +9,13 @@ const ROOM_NAVIGATION = [
 ] as const;
 
 export function RoomHeader({
-  dimmed,
   roomName,
   roomSwitcher,
   onInvite,
-  onToggleDim,
 }: {
-  dimmed: boolean;
   roomName: string;
   roomSwitcher: ReactNode;
   onInvite: () => void;
-  onToggleDim: () => void;
 }) {
   return (
     <header className="room-header">
@@ -36,17 +32,6 @@ export function RoomHeader({
         ))}
       </nav>
       <div className="room-tools">
-        <button
-          type="button"
-          className="secondary small dim-control"
-          aria-label={dimmed ? 'Restore brightness' : 'Dim screen'}
-          aria-pressed={dimmed}
-          title={dimmed ? 'Restore screen brightness' : 'Reduce screen brightness'}
-          onClick={onToggleDim}
-        >
-          {dimmed ? <Sun size={18} /> : <SunDim size={18} />}
-          <span>{dimmed ? 'Restore brightness' : 'Dim screen'}</span>
-        </button>
         <button
           type="button"
           className="secondary small invite-device-button"

@@ -324,11 +324,9 @@ export function Room({
     <main className="room">
       <div ref={audioRef} hidden />
       <RoomHeader
-        dimmed={dim}
         roomName={session.roomName}
         roomSwitcher={roomSwitcher}
         onInvite={() => setModal('invite')}
-        onToggleDim={() => setDim(!dim)}
       />
       <div className="room-scroll">
         <div className="room-content">
@@ -361,6 +359,7 @@ export function Room({
               babies,
               busy,
               connected,
+              dimmed: dim,
               events,
               isBaby,
               level,
@@ -379,6 +378,7 @@ export function Room({
               resumeAudio,
               stopListening: (deviceId) => callsRef.current?.stop(deviceId),
               testNotification,
+              toggleDim: () => setDim(!dim),
               toggleMonitoring,
             }}
           >

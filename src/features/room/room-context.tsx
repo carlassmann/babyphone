@@ -8,6 +8,7 @@ export type RoomModel = {
   babies: PublicDevice[];
   busy: boolean;
   connected: boolean;
+  dimmed: boolean;
   events: Alert[];
   isBaby: boolean;
   level: number;
@@ -26,6 +27,7 @@ export type RoomModel = {
   resumeAudio: (deviceId: string) => void;
   stopListening: (deviceId: string) => void;
   testNotification: () => Promise<void>;
+  toggleDim: () => void;
   toggleMonitoring: () => Promise<void>;
 };
 

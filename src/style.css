@@ -169,6 +169,9 @@ button svg {
   gap: 10px;
 }
 .dim-control {
+  display: flex;
+  width: fit-content;
+  margin: 20px auto 0;
   white-space: nowrap;
 }
 .primary,
@@ -491,7 +494,7 @@ legend {
   background: var(--mint-soft);
 }
 
-.application {
+.app-shell.application {
   position: fixed;
   inset: var(--visual-viewport-top, 0) 0 auto;
   width: 100%;
