@@ -1117,6 +1117,42 @@ input[type='range']:disabled {
 .settings-card .rename-field {
   margin: 0;
 }
+.device-rows {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.device-rows li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0;
+}
+.device-rows li.renaming {
+  align-items: end;
+  padding: 12px 0;
+}
+.device-rows li.renaming .rename-field {
+  flex: 1;
+}
+.device-rows li + li {
+  border-top: var(--hairline) solid var(--line-strong);
+}
+.device-rows li > div {
+  min-width: 0;
+  flex: 1;
+}
+.device-rows strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+.device-rows li > div > span {
+  color: var(--muted);
+  font-size: 14px;
+}
 .settings-links {
   padding: 6px 8px;
 }

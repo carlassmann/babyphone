@@ -2,12 +2,14 @@ import { createContext, useContext, type ReactNode } from 'react';
 import type { Alert, PublicDevice, Session } from '../../protocol';
 
 export type RoomModel = {
+  accessNotice: string;
   active: boolean;
   audioStatuses: Record<string, string>;
   awake: boolean;
   babies: PublicDevice[];
   busy: boolean;
   connected: boolean;
+  devices: PublicDevice[];
   dimmed: boolean;
   events: Alert[];
   isBaby: boolean;
@@ -25,6 +27,7 @@ export type RoomModel = {
   listenTo: (deviceId: string) => void;
   openInvitation: () => void;
   openSettings: () => void;
+  removeDevice: (deviceId: string) => void;
   resumeAudio: (deviceId: string) => void;
   stopListening: (deviceId: string) => void;
   testNotification: () => Promise<void>;

@@ -5,11 +5,15 @@ import {
   DeviceIcon,
   DisclosureIcon,
   ForwardIcon,
+  ParentIcon,
   RoomIcon,
   type IconComponent,
 } from '../../../icons';
+import { useState } from 'react';
 import { request } from '../../../connection';
+import type { PublicDevice } from '../../../protocol';
 import { RenameField } from '../parts/room-components';
+import { RemoveDeviceConfirmation } from '../parts/room-modals';
 import { useRoom } from '../room-context';
 
 export function SettingsScreen() {
@@ -26,6 +30,7 @@ export function SettingsScreen() {
           />
         </SettingsCard>
       )}
+      <RoomDevices room={room} />
       {room.isBaby ? (
         <SettingsCard icon={BabyIcon} title="Device setup">
           <BabySetup />
@@ -46,6 +51,111 @@ export function SettingsScreen() {
         {room.preferences}
       </section>
     </>
+  );
+}
+
+function RoomDevices({ room }: { room: ReturnType<typeof useRoom> }) {
+  const [pendingRemoval, setPendingRemoval] = useState<PublicDevice | null>(null);
+  const otherDevices = room.devices.filter((device) => device.id !== room.session.deviceId);
+
+  if (otherDevices.length === 0 && !room.accessNotice) return null;
+
+  return (
+    <SettingsCard icon={ParentIcon} title="Devices in this room">
+      <ul className="device-rows">
+        {otherDevices.map((device) => (
+          <DeviceRow
+            key={device.id}
+            device={device}
+            room={room}
+            onRemove={() => setPendingRemoval(device)}
+          />
+        ))}
+      </ul>
+      {room.accessNotice ? (
+        <p className="caption" role="status">
+          {room.accessNotice}
+        </p>
+      ) : (
+        <p className="caption">
+          Removing a device also resets the invitation link. Devices that stay keep their
+          connection.
+        </p>
+      )}
+      {pendingRemoval && (
+        <RemoveDeviceConfirmation
+          device={pendingRemoval}
+          busy={room.busy}
+          onCancel={() => setPendingRemoval(null)}
+          onConfirm={() => {
+            room.removeDevice(pendingRemoval.id);
+            setPendingRemoval(null);
+          }}
+        />
+      )}
+    </SettingsCard>
+  );
+}
+
+function DeviceRow({
+  device,
+  room,
+  onRemove,
+}: {
+  device: PublicDevice;
+  room: ReturnType<typeof useRoom>;
+  onRemove: () => void;
+}) {
+  const [renaming, setRenaming] = useState(false);
+
+  if (renaming) {
+    return (
+      <li className="renaming">
+        <RenameField
+          label={`Name for ${device.name}`}
+          value={device.name}
+          onSave={async (name) => {
+            await request('rename-device', { ...room.session, name, target: device.id });
+            setRenaming(false);
+          }}
+        />
+        <button type="button" className="quiet small" onClick={() => setRenaming(false)}>
+          Cancel
+        </button>
+      </li>
+    );
+  }
+
+  return (
+    <li>
+      <span className="card-icon">
+        {device.role === 'baby' ? <BabyIcon size={19} /> : <ParentIcon size={19} />}
+      </span>
+      <div>
+        <strong>{device.name}</strong>
+        <span>
+          {device.role === 'baby' ? 'Baby' : 'Parent'} · {device.online ? 'Online' : 'Offline'}
+        </span>
+      </div>
+      <button
+        type="button"
+        className="quiet small"
+        disabled={!room.connected}
+        onClick={() => setRenaming(true)}
+        aria-label={`Rename ${device.name}`}
+      >
+        Rename
+      </button>
+      <button
+        type="button"
+        className="quiet small danger"
+        disabled={room.busy || !room.connected}
+        onClick={onRemove}
+        aria-label={`Remove ${device.name}`}
+      >
+        Remove
+      </button>
+    </li>
   );
 }
 

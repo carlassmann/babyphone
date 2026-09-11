@@ -373,12 +373,14 @@ export function Room({
           </div>
           <RoomProvider
             value={{
+              accessNotice,
               active,
               audioStatuses,
               awake,
               babies,
               busy,
               connected,
+              devices,
               dimmed: dim,
               events,
               isBaby,
@@ -396,6 +398,7 @@ export function Room({
               listenTo,
               openInvitation: () => setModal('invite'),
               openSettings: () => setModal('settings'),
+              removeDevice: (deviceId) => void manageAccess(deviceId),
               resumeAudio,
               stopListening: (deviceId) => callsRef.current?.stop(deviceId),
               testNotification,
@@ -426,15 +429,11 @@ export function Room({
       )}
       {modal === 'settings' && (
         <DeviceSettingsModal
-          accessNotice={accessNotice}
           busy={busy}
-          connected={connected}
-          devices={devices}
           session={session}
           onChangeRole={() => void changeRole()}
           onClose={() => setModal('')}
           onLeave={() => void leave()}
-          onRemoveDevice={(deviceId) => void manageAccess(deviceId)}
         />
       )}
     </main>

@@ -84,29 +84,19 @@ export function InvitationModal({
 }
 
 export function DeviceSettingsModal({
-  accessNotice,
   busy,
-  connected,
-  devices,
   session,
   onChangeRole,
   onClose,
   onLeave,
-  onRemoveDevice,
 }: {
-  accessNotice: string;
   busy: boolean;
-  connected: boolean;
-  devices: PublicDevice[];
   session: Session;
   onChangeRole: () => void;
   onClose: () => void;
   onLeave: () => void;
-  onRemoveDevice: (deviceId: string) => void;
 }) {
   const isBaby = session.role === 'baby';
-  const otherDevices = devices.filter((device) => device.id !== session.deviceId);
-  const [devicePendingRemoval, setDevicePendingRemoval] = useState<PublicDevice | null>(null);
 
   return (
     <Modal title="Device settings" close={onClose}>
@@ -127,58 +117,6 @@ export function DeviceSettingsModal({
         <DisclosureIcon size={17} />
       </button>
       <p className="caption">Switching roles pauses monitoring and stops live audio.</p>
-      {otherDevices.length > 0 && (
-        <>
-          <hr />
-          <h3>Room access</h3>
-          <p className="caption">
-            Any device can remove devices. Removal also resets the invitation link. Existing devices
-            stay connected.
-          </p>
-          {otherDevices.map((device) => (
-            <div className="setting-detail" key={device.id}>
-              <div>
-                <RenameField
-                  label={`Name for ${device.name}`}
-                  value={device.name}
-                  onSave={(name) =>
-                    request('rename-device', { ...session, name, target: device.id })
-                  }
-                />
-                <p>
-                  {device.role === 'baby' ? 'Baby' : 'Parent'} ·{' '}
-                  {device.online ? 'Online' : 'Offline'}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="quiet danger"
-                disabled={busy || !connected}
-                onClick={() => setDevicePendingRemoval(device)}
-                aria-label={`Remove ${device.name}`}
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-          {accessNotice && (
-            <p role="status" className="caption">
-              {accessNotice}
-            </p>
-          )}
-        </>
-      )}
-      {devicePendingRemoval && (
-        <RemoveDeviceConfirmation
-          device={devicePendingRemoval}
-          busy={busy}
-          onCancel={() => setDevicePendingRemoval(null)}
-          onConfirm={() => {
-            onRemoveDevice(devicePendingRemoval.id);
-            setDevicePendingRemoval(null);
-          }}
-        />
-      )}
       <hr />
       <button type="button" className="quiet danger" disabled={busy} onClick={onLeave}>
         Leave this room <ForwardIcon size={16} />
@@ -188,7 +126,7 @@ export function DeviceSettingsModal({
   );
 }
 
-function RemoveDeviceConfirmation({
+export function RemoveDeviceConfirmation({
   device,
   busy,
   onCancel,
