@@ -82,8 +82,8 @@ function NotificationSetup({ room }: { room: ReturnType<typeof useRoom> }) {
         </p>
       )}
       <p className="caption">
-        Allow notifications in your device settings too. On iPhone, install Pip first. Notifications
-        can be delayed by your device or network.
+        Allow notifications in your device settings too. Delivery can be delayed by your device or
+        network.
       </p>
     </>
   );

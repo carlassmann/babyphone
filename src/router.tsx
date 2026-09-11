@@ -23,7 +23,6 @@ const landing = createRoute({
   beforeLoad: ({ location }) => {
     if (new URLSearchParams(location.hash).has('join'))
       throw redirect({ to: '/app/join', hash: location.hash, replace: true });
-    if (readSession()) throw redirect({ to: '/app', replace: true });
   },
 });
 const app = createRoute({

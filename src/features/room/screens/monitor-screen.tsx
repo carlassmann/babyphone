@@ -3,6 +3,7 @@ import { relativeTime } from '../../../format';
 import { AudioMeter } from '../parts/room-components';
 import { useRoom } from '../room-context';
 import { SENSITIVITY_THRESHOLDS } from '../../../noise';
+import { PipMascot } from '../../../PipMascot';
 
 const AUDIO_ACTIVE_STATUSES = [
   'Listening live',
@@ -22,10 +23,15 @@ export function MonitorScreen() {
 }
 
 function BabyMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
+  const soundDetected = room.active && room.level >= SENSITIVITY_THRESHOLDS[room.sensitivity - 1]!;
+
   return (
     <>
       <div className="monitor-hero">
-        <img src="/pip-sleeping.png" alt="Pip sleeping" />
+        <PipMascot
+          state={!room.active ? 'paused' : soundDetected ? 'sound' : 'quiet'}
+          alt="Pip sleeping"
+        />
         <span className={`status ${room.active && room.connected ? 'green' : ''}`}>
           <i />
           {room.active
@@ -44,13 +50,7 @@ function BabyMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
       <div className="meter-wrap">
         <div>
           <span>Room sound</span>
-          <span>
-            {room.active && room.level >= SENSITIVITY_THRESHOLDS[room.sensitivity - 1]!
-              ? 'A little sound'
-              : room.active
-                ? 'Quiet'
-                : 'Microphone off'}
-          </span>
+          <span>{soundDetected ? 'A little sound' : room.active ? 'Quiet' : 'Microphone off'}</span>
         </div>
         <AudioMeter value={room.active ? room.level : 0} />
       </div>
@@ -95,7 +95,11 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
   if (room.babies.length === 0) {
     return (
       <div className="empty-nest">
-        <img src="/pip-sleeping.png" alt="Pip waiting for a baby device" />
+        <PipMascot
+          className="empty-nest-mascot"
+          state="quiet"
+          alt="Pip waiting for a baby device"
+        />
         <h2>Add your baby device</h2>
         <p>
           Add a device to stay with your baby.

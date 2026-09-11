@@ -2,6 +2,7 @@ import { useCallback, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { ArrowLeft, ArrowRight, Bell, Headphones, Link, Mic, Moon, Smartphone } from 'lucide-react';
 import { InvitationScanner } from './InvitationScanner';
+import { PipMascot } from './PipMascot';
 import { request } from './connection';
 import { errorMessage } from './format';
 import type { Role, Session } from './protocol';
@@ -62,20 +63,22 @@ export function Welcome({
             <em>the next room.</em>
           </h1>
           <div className="mascot-wrap">
-            <img
-              className="mascot"
-              src="/pip-sleeping.png"
-              alt="A little yellow bird sleeping on a blue crescent cushion"
-            />
+            <figure className="landing-mascot-state">
+              <PipMascot
+                className="landing-mascot"
+                state="quiet"
+                alt="Pip breathing gently while the room is quiet"
+              />
+              <figcaption>
+                Psst… tap<span className="pip-hover-hint"> or hover</span> to wake Pip.
+              </figcaption>
+            </figure>
           </div>
         </section>
       )}
       <section className="welcome-content">
         {!mode ? (
           <>
-            <div className="tiny-moon">
-              <Moon size={24} />
-            </div>
             <h2>
               {appMode ? (
                 'Set up your monitor'
@@ -112,7 +115,7 @@ export function Welcome({
                   <span className="step-icon">
                     <Smartphone size={18} />
                   </span>
-                  Two devices
+                  Two or more devices
                 </span>
                 <span>
                   <span className="step-icon">

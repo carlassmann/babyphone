@@ -1,17 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
-import { Toaster } from 'sonner';
-import { ChevronDown, Download, Moon, Sun } from 'lucide-react';
+import { Toaster, toast } from 'sonner';
 import { usePwa } from './pwa';
 import { Welcome } from './Welcome';
 import { Room } from './features/room';
 import { ApiError, request } from './connection';
 import type { Session } from './protocol';
 import { readSession, readRooms, sessionsEqual, storeActive, storeRooms } from './sessions';
-import { AppInfoModal, InvitationModal, RoomsModal } from './AppModals';
+import { InvitationModal, PrivacyModal, RoomsPopover } from './AppModals';
 
-type Theme = 'dark' | 'light';
-type AppModal = '' | 'rooms' | 'install' | 'privacy';
+type AppModal = '' | 'privacy';
 
 export function App() {
   useEffect(() => {
@@ -77,7 +75,6 @@ export function App() {
         roomKey: state.roomKey || room.roomKey,
         name: own.name,
       });
-      setModal('');
     } catch (error) {
       setSwitchError(error instanceof Error ? error.message : 'Could not switch rooms.');
       throw error;
@@ -91,7 +88,6 @@ export function App() {
     setSwitchError('');
     try {
       await deactivateCurrent();
-      setModal('');
       await navigate({ to, hash });
     } catch (error) {
       setSwitchError(error instanceof Error ? error.message : 'Connect before switching rooms.');
@@ -130,16 +126,25 @@ export function App() {
   }, []);
 
   const pwa = usePwa();
-  const [theme, setTheme] = useState<Theme>(
-    () =>
-      (localStorage.getItem('pip-theme') as Theme | null) ||
-      (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
-  );
+  const appMode = route.pathname.startsWith('/app') || !!incoming;
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem('pip-theme', theme);
-  }, [theme]);
-  const appMode = route.pathname.startsWith('/app') || !!session || !!incoming;
+    if (appMode || pwa.installed || sessionStorage.getItem('pip-install-tip-seen')) return;
+    const timer = setTimeout(
+      () => {
+        sessionStorage.setItem('pip-install-tip-seen', 'true');
+        toast('Install Pip', {
+          id: 'pip-install',
+          description: 'Keep it one tap away on this device.',
+          duration: 7000,
+          action: pwa.canInstall
+            ? { label: 'Install', onClick: () => void pwa.install() }
+            : undefined,
+        });
+      },
+      pwa.canInstall ? 400 : 1800,
+    );
+    return () => clearTimeout(timer);
+  }, [appMode, pwa.canInstall, pwa.install, pwa.installed]);
   function saveSession(value: Session | null) {
     setRooms((current) =>
       storeRooms(
@@ -153,18 +158,21 @@ export function App() {
     setSession(value);
   }
   const roomSwitcher = (
-    <button
-      type="button"
-      className="room-switcher"
-      onClick={() => {
-        setSwitchError('');
-        setModal('rooms');
-      }}
-      aria-label="Switch room"
-    >
-      <span>{session?.roomName || 'Saved rooms'}</span>
-      <ChevronDown size={18} />
-    </button>
+    <RoomsPopover
+      activeDeviceId={session?.deviceId}
+      align={appMode ? 'start' : 'end'}
+      error={switchError}
+      rooms={rooms}
+      switching={switching}
+      onActivate={activate}
+      onAdd={addRoom}
+      onOpen={() => setSwitchError('')}
+      onForget={(room) =>
+        setRooms((current) =>
+          storeRooms(current.filter((saved) => saved.deviceId !== room.deviceId)),
+        )
+      }
+    />
   );
   return (
     <AppContext.Provider
@@ -172,8 +180,6 @@ export function App() {
         session,
         saveSession,
         pwa,
-        theme,
-        setTheme,
         setModal,
         incoming,
         roomSwitcher,
@@ -183,42 +189,25 @@ export function App() {
       <div className={appMode ? 'app-shell application' : 'app-shell'}>
         {!(session && appMode) && (
           <header className="topbar">
-            <Link className="brand" to={appMode ? '/app' : '/'} aria-label="Pip home">
+            <Link className="brand" to={appMode ? '/app' : '/'} aria-label="Pip homepage">
               <img src="/icon.svg" alt="" />
               pip
             </Link>
-            <div className="shell-actions">
-              {rooms.length > 0 && roomSwitcher}
-              <button
-                type="button"
-                className="icon-button"
-                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              >
-                {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
-              </button>
-              {!appMode && (
-                <Link className="secondary small" to="/app">
-                  Open Pip
-                </Link>
-              )}
-              {appMode && rooms.length === 0 && (
-                <button type="button" className="quiet small" onClick={() => setModal('privacy')}>
-                  Privacy
-                </button>
-              )}
-              {!pwa.installed && (rooms.length === 0 || !appMode) && (
-                <button type="button" className="quiet small" onClick={() => setModal('install')}>
-                  <Download size={17} />
-                  <span>Get the app</span>
-                </button>
-              )}
-            </div>
+            {(rooms.length > 0 || appMode) && (
+              <div className="shell-actions">
+                {rooms.length > 0 && roomSwitcher}
+                {appMode && rooms.length === 0 && (
+                  <button type="button" className="quiet small" onClick={() => setModal('privacy')}>
+                    Privacy
+                  </button>
+                )}
+              </div>
+            )}
           </header>
         )}
         <Outlet />
         <Toaster
-          theme={theme === 'dark' ? 'dark' : 'light'}
+          theme="system"
           position="bottom-right"
           offset={{ bottom: 96, right: 24 }}
           mobileOffset={{ bottom: session ? 104 : 16, left: 16, right: 16 }}
@@ -227,8 +216,16 @@ export function App() {
         {!appMode && (
           <footer>
             <button type="button" onClick={() => setModal('privacy')}>
-              Privacy & how it works
+              Privacy
             </button>
+            <nav aria-label="Project links">
+              <a href="https://github.com/carlassmann/babyphone" target="_blank" rel="noreferrer">
+                GitHub
+              </a>
+              <a href="https://carlassmann.com" target="_blank" rel="noreferrer">
+                carlassmann.com
+              </a>
+            </nav>
           </footer>
         )}
         {session &&
@@ -243,25 +240,7 @@ export function App() {
               onDismiss={dismissInvitation}
             />
           )}
-        {modal === 'rooms' && (
-          <RoomsModal
-            activeDeviceId={session?.deviceId}
-            error={switchError}
-            rooms={rooms}
-            switching={switching}
-            onActivate={(room) => void activate(room).catch(() => {})}
-            onAdd={(path) => void addRoom(path).catch(() => {})}
-            onClose={() => setModal('')}
-            onForget={(room) =>
-              setRooms((current) =>
-                storeRooms(current.filter((saved) => saved.deviceId !== room.deviceId)),
-              )
-            }
-          />
-        )}
-        {(modal === 'install' || modal === 'privacy') && (
-          <AppInfoModal kind={modal} pwa={pwa} onClose={() => setModal('')} />
-        )}
+        {modal === 'privacy' && <PrivacyModal onClose={() => setModal('')} />}
       </div>
     </AppContext.Provider>
   );
@@ -271,8 +250,6 @@ type AppContextValue = {
   session: Session | null;
   saveSession: (session: Session | null) => void;
   pwa: ReturnType<typeof usePwa>;
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
   setModal: (modal: AppModal) => void;
   incoming: string;
   roomSwitcher: React.ReactNode;
@@ -289,17 +266,7 @@ export function LandingScreen() {
   return <Welcome onJoin={saveSession} />;
 }
 export function AppScreen() {
-  const {
-    session,
-    saveSession,
-    pwa,
-    incoming,
-    theme,
-    setTheme,
-    setModal,
-    roomSwitcher,
-    updateSession,
-  } = useApp();
+  const { session, saveSession, pwa, incoming, setModal, roomSwitcher, updateSession } = useApp();
   if (session)
     return (
       <Room
@@ -311,19 +278,6 @@ export function AppScreen() {
         updateSession={updateSession}
         preferences={
           <section className="side-card preferences">
-            <h3>This app</h3>
-            <button
-              type="button"
-              className="quiet full"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            >
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-              {theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            </button>
-            <button type="button" className="quiet full" onClick={() => setModal('install')}>
-              <Download size={18} />
-              {pwa.installed ? 'App installed' : 'Install Pip'}
-            </button>
             <button type="button" className="quiet full" onClick={() => setModal('privacy')}>
               Privacy
             </button>

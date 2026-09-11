@@ -15,7 +15,7 @@ Pip is a working local prototype. Nothing has been deployed.
 - Keep baby and parent screens awake while Pip is open. The app shows when the browser denies wake lock.
 - Adjust each baby's saved sensitivity from any parent device.
 - View and reset room activity, with up to 30 events from the last 24 hours.
-- Install the PWA, switch light/dark appearance, and dim either device's screen.
+- Install the PWA, follow the system appearance, and dim either device's screen.
 
 Real desktop Chrome and Safari testing covered microphones, cross-browser audio, simultaneous listening, push delivery with parent tabs closed, and wake locks. Chrome installation and service-worker updates also passed. Physical locked-phone delivery and Cloudflare TURN across networks still need testing. See [test evidence](TESTING.md).
 
@@ -116,7 +116,7 @@ Pip measures sustained sound, not whether a baby is crying. It is an extra pair 
 
 Baby sensitivity is stored per device in its room and can be changed by that baby or any parent in the room. Changes sync immediately and survive reloads. Parents request screen wake lock while the room is open, including Activity and Settings. Wake lock can still be denied or revoked by the OS; Pip displays its status and retries after release, returning to the foreground, or interacting with the screen.
 
-Light/dark appearance and screen dimming are separate, device-local preferences. Dark mode covers the app and dialogs; dimming is available on both baby and parent screens. Both choices persist across reloads.
+Pip follows the device's light or dark appearance. Screen dimming is a separate device-local preference available on baby and parent screens, and persists across reloads.
 
 ## Verification
 
@@ -138,4 +138,4 @@ References: [Durable Object WebSockets](https://developers.cloudflare.com/durabl
 
 `/app` is the monitor, `/app/activity` is the event log, and `/app/settings` contains device and app settings. Setup uses `/app/create` and `/app/join`. TanStack Router handles navigation, history, and direct links. The room connection and audio live in the shared app layout and remain active while switching pages. Existing hash invitation links and setup query links still work.
 
-An available service-worker update appears in a toast on app load or after returning to the foreground. Updating requires an explicit click. While this device is monitoring or listening, the toast asks you to pause first and does not offer the update action. Theme, install instructions, and privacy information live in Settings.
+An available service-worker update appears in a toast on app load or after returning to the foreground. Updating requires an explicit click. While this device is monitoring or listening, the toast asks you to pause first and does not offer the update action. Installation is suggested with a toast. Privacy information lives in Settings.

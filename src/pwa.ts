@@ -81,17 +81,22 @@ export function usePwa() {
       window.removeEventListener('appinstalled', complete);
     };
   }, []);
+  const install = useCallback(async () => {
+    if (!prompt) return;
+    await prompt.prompt();
+    const choice = await prompt.userChoice;
+    if (choice.outcome === 'accepted') {
+      setInstalled(true);
+      toast.dismiss('pip-install');
+    }
+    setPrompt(undefined);
+  }, [prompt]);
   return {
     installed,
     waiting,
     error,
     canInstall: !!prompt,
-    install: async () => {
-      await prompt?.prompt();
-      const choice = await prompt?.userChoice;
-      if (choice?.outcome === 'accepted') setInstalled(true);
-      setPrompt(undefined);
-    },
+    install,
     update,
     setUpdateBlocked,
   };

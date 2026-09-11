@@ -4,7 +4,6 @@ const ASSETS = [
   '/icon.svg',
   '/icon-192.png',
   '/icon-512.png',
-  '/pip-sleeping.png',
   '/manifest.webmanifest',
 ];
 self.addEventListener('install', (event) =>

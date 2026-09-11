@@ -1,6 +1,7 @@
-import { Check, Download } from 'lucide-react';
+import { useId, useState } from 'react';
+import * as Popover from '@radix-ui/react-popover';
+import { Check, ChevronDown } from 'lucide-react';
 import type { Session } from './protocol';
-import type { usePwa } from './pwa';
 import { Modal } from './Modal';
 
 export function InvitationModal({
@@ -37,139 +38,136 @@ export function InvitationModal({
   );
 }
 
-export function RoomsModal({
+export function RoomsPopover({
   activeDeviceId,
+  align,
   error,
   rooms,
   switching,
   onActivate,
   onAdd,
-  onClose,
   onForget,
+  onOpen,
 }: {
   activeDeviceId?: string;
+  align: 'start' | 'end';
   error: string;
   rooms: Session[];
   switching: boolean;
-  onActivate: (room: Session) => void;
-  onAdd: (path: '/app/create' | '/app/join') => void;
-  onClose: () => void;
+  onActivate: (room: Session) => Promise<void>;
+  onAdd: (path: '/app/create' | '/app/join') => Promise<void>;
   onForget: (room: Session) => void;
+  onOpen: () => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const titleId = useId();
+
+  async function activate(room: Session) {
+    try {
+      await onActivate(room);
+      setOpen(false);
+    } catch {}
+  }
+
+  async function add(path: '/app/create' | '/app/join') {
+    try {
+      await onAdd(path);
+      setOpen(false);
+    } catch {}
+  }
+
   return (
-    <Modal title="Your rooms" close={() => !switching && onClose()}>
-      <p>
-        Only the active room monitors or sends notifications to this device. Switching stops live
-        audio.
-      </p>
-      <div className="saved-rooms">
-        {rooms.map((room) => (
-          <div className="saved-room" key={room.roomId}>
+    <Popover.Root
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (switching) return;
+        if (nextOpen) onOpen();
+        setOpen(nextOpen);
+      }}
+    >
+      <Popover.Trigger asChild>
+        <button type="button" className="room-switcher" aria-label="Switch room">
+          <span>
+            {rooms.find((room) => room.deviceId === activeDeviceId)?.roomName || 'Saved rooms'}
+          </span>
+          <ChevronDown size={18} />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          className="rooms-popover"
+          align={align}
+          sideOffset={8}
+          collisionPadding={16}
+          aria-labelledby={titleId}
+        >
+          <h2 id={titleId}>Your rooms</h2>
+          <p>Switching rooms stops live audio.</p>
+          <div className="saved-rooms">
+            {rooms.map((room) => (
+              <div className="saved-room" key={room.roomId}>
+                <button
+                  type="button"
+                  className="secondary full"
+                  disabled={switching}
+                  onClick={() => void activate(room)}
+                >
+                  <span>
+                    {room.roomName}
+                    <small>
+                      {room.name} · {room.role === 'baby' ? 'Baby' : 'Parent'}
+                    </small>
+                  </span>
+                  {room.deviceId === activeDeviceId && <Check size={18} />}
+                </button>
+                {room.deviceId !== activeDeviceId && (
+                  <button
+                    type="button"
+                    className="quiet small"
+                    disabled={switching}
+                    aria-label={`Forget ${room.roomName}`}
+                    onClick={() => onForget(room)}
+                  >
+                    Forget
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="rooms-popover-actions">
             <button
               type="button"
-              className="secondary full"
+              className="primary"
               disabled={switching}
-              onClick={() => onActivate(room)}
+              onClick={() => void add('/app/create')}
             >
-              <span>
-                {room.roomName}
-                <small>
-                  {room.name} · {room.role === 'baby' ? 'Baby' : 'Parent'}
-                </small>
-              </span>
-              {room.deviceId === activeDeviceId && <Check size={18} />}
+              Create a room
             </button>
-            {room.deviceId !== activeDeviceId && (
-              <button
-                type="button"
-                className="quiet small"
-                disabled={switching}
-                aria-label={`Forget ${room.roomName}`}
-                onClick={() => onForget(room)}
-              >
-                Forget
-              </button>
-            )}
+            <button
+              type="button"
+              className="secondary"
+              disabled={switching}
+              onClick={() => void add('/app/join')}
+            >
+              Join a room
+            </button>
           </div>
-        ))}
-      </div>
-      <button
-        type="button"
-        className="primary full"
-        disabled={switching}
-        onClick={() => onAdd('/app/create')}
-      >
-        Create a room
-      </button>
-      <button
-        type="button"
-        className="secondary full"
-        disabled={switching}
-        onClick={() => onAdd('/app/join')}
-      >
-        Join a room
-      </button>
-      {error && (
-        <p role="alert" className="notice">
-          {error}
-        </p>
-      )}
-    </Modal>
+          {error && (
+            <p role="alert" className="notice">
+              {error}
+            </p>
+          )}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
-export function AppInfoModal({
-  kind,
-  pwa,
-  onClose,
-}: {
-  kind: 'install' | 'privacy';
-  pwa: ReturnType<typeof usePwa>;
-  onClose: () => void;
-}) {
+export function PrivacyModal({ onClose }: { onClose: () => void }) {
   return (
-    <Modal title={kind === 'install' ? 'Install Pip' : 'Privacy'} close={onClose}>
-      {kind === 'install' ? <InstallContent pwa={pwa} /> : <PrivacyContent />}
+    <Modal title="Privacy" close={onClose}>
+      <PrivacyContent />
     </Modal>
-  );
-}
-
-function InstallContent({ pwa }: { pwa: ReturnType<typeof usePwa> }) {
-  return (
-    <>
-      <div className="install-icon">
-        <img src="/icon.svg" alt="Pip" />
-      </div>
-      <p>Keep Pip a tap away. Install it on both devices for the best experience.</p>
-      {pwa.installed ? (
-        <p className="notice success">
-          <Check />
-          Pip is installed on this device.
-        </p>
-      ) : pwa.canInstall ? (
-        <button type="button" className="primary full" onClick={() => void pwa.install()}>
-          Install Pip <Download size={18} />
-        </button>
-      ) : (
-        <div className="instructions">
-          <p>
-            <strong>iPhone / iPad</strong>
-            <br />
-            In Safari, tap Share → Add to Home Screen. Open Pip from its new icon before enabling
-            notifications.
-          </p>
-          <p>
-            <strong>Android / desktop</strong>
-            <br />
-            Use your browser menu → Install app or Add to Home Screen. In Safari on Mac, choose File
-            → Add to Dock.
-          </p>
-        </div>
-      )}
-      <p className="caption">
-        The baby device must stay plugged in, with Pip open and its screen awake.
-      </p>
-    </>
   );
 }
 
@@ -181,10 +179,14 @@ function PrivacyContent() {
         audio connection between your devices, with a relay only when needed.
       </p>
       <p>Your invitation code is the key to your room. Share it only with people you trust.</p>
-      <p className="notice">
-        This is a prototype and an extra pair of ears. Keep checking on your baby; browsers,
-        networks, and notifications can stop working.
-      </p>
+      <div className="project-links">
+        <a href="https://github.com/carlassmann/babyphone" target="_blank" rel="noreferrer">
+          Source code
+        </a>
+        <a href="https://carlassmann.com" target="_blank" rel="noreferrer">
+          carlassmann.com
+        </a>
+      </div>
     </>
   );
 }

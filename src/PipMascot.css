@@ -1,0 +1,245 @@
+.monitor-mascot {
+  position: relative;
+  width: 230px;
+  height: 190px;
+  margin: 0 auto -14px;
+  padding: 0;
+  color: var(--mint);
+  background: transparent;
+  border-radius: 32%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.monitor-mascot:active {
+  transform: none;
+}
+
+.pip-character {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 220ms ease;
+}
+
+.monitor-mascot.paused .pip-character {
+  opacity: 0.7;
+}
+
+.pip-feather-lines {
+  fill: none;
+  stroke: #d9ad60;
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.3;
+}
+
+.pip-body-posture,
+.pip-head-posture,
+.pip-wing-posture,
+.pip-eyes-open,
+.pip-tuft {
+  transition: transform 850ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pip-body-posture,
+.pip-breath {
+  transform-origin: 192px 222px;
+}
+
+.pip-head-posture,
+.pip-head-breathe {
+  transform-origin: 171px 176px;
+}
+
+.pip-head-posture {
+  transform: translateY(4px) rotate(-8deg);
+}
+
+.pip-wing-posture,
+.pip-wing-breathe {
+  transform-origin: 233px 154px;
+}
+
+.pip-tuft {
+  transform-origin: 141px 72px;
+  transform: rotate(-7deg);
+}
+
+.pip-eyes-open,
+.pip-blink {
+  transform-origin: 143px 134px;
+}
+
+.pip-eyes-open {
+  opacity: 0;
+  transform: scaleY(0.15);
+  transition:
+    opacity 180ms ease,
+    transform 450ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pip-eyes-closed,
+.pip-sleep-marks,
+.pip-sound-marks {
+  transition: opacity 220ms ease;
+}
+
+.pip-sound-marks {
+  opacity: 0;
+}
+
+.pip-beak-lower {
+  transform-origin: 2px 2px;
+  transform: scaleY(0.55);
+}
+
+.monitor-mascot[data-pose='awake'] .pip-body-posture {
+  transform: translateY(-2px) scaleY(1.035);
+}
+
+.monitor-mascot[data-pose='awake'] .pip-head-posture {
+  transform: translate(2px, -12px) rotate(3deg);
+  transition-duration: 620ms;
+}
+
+.monitor-mascot[data-pose='awake'] .pip-wing-posture {
+  transform: rotate(-16deg) translateY(-2px);
+  transition-duration: 700ms;
+}
+
+.monitor-mascot[data-pose='awake'] .pip-tuft {
+  transform: rotate(9deg);
+}
+
+.monitor-mascot[data-pose='awake'] .pip-eyes-open {
+  opacity: 1;
+  transform: scaleY(1);
+  transition-delay: 100ms;
+}
+
+.monitor-mascot[data-pose='awake'] .pip-eyes-closed,
+.monitor-mascot[data-pose='awake'] .pip-sleep-marks {
+  opacity: 0;
+}
+
+.monitor-mascot.sound .pip-sound-marks {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .monitor-mascot:not(.paused) .pip-breath {
+    animation: pip-chest-breath 4s cubic-bezier(0.45, 0, 0.35, 1) infinite;
+  }
+
+  .monitor-mascot:not(.paused) .pip-head-breathe {
+    animation: pip-head-breath 4s cubic-bezier(0.45, 0, 0.35, 1) infinite;
+    animation-delay: 120ms;
+  }
+
+  .monitor-mascot:not(.paused) .pip-wing-breathe {
+    animation: pip-wing-breath 4s cubic-bezier(0.45, 0, 0.35, 1) infinite;
+    animation-delay: 200ms;
+  }
+
+  .monitor-mascot:not(.paused) .pip-sleep-mark {
+    animation: pip-dream 4.8s ease-in-out infinite;
+  }
+
+  .monitor-mascot:not(.paused) .pip-sleep-mark + .pip-sleep-mark {
+    animation-delay: 900ms;
+  }
+
+  .monitor-mascot[data-pose='awake'] .pip-blink {
+    animation: pip-blink 4.6s ease-in-out infinite;
+  }
+
+  .monitor-mascot[data-pose='awake'] .pip-beak-lower {
+    animation: pip-yawn 1500ms ease-in-out;
+  }
+}
+
+@keyframes pip-chest-breath {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.025, 1.065);
+  }
+}
+
+@keyframes pip-head-breath {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  42% {
+    transform: translateY(-3px) rotate(1.2deg);
+  }
+}
+
+@keyframes pip-wing-breath {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  42% {
+    transform: rotate(-3deg);
+  }
+}
+
+@keyframes pip-dream {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(1px);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes pip-blink {
+  0%,
+  14%,
+  20%,
+  64%,
+  70%,
+  100% {
+    transform: scaleY(1);
+  }
+  17%,
+  67% {
+    transform: scaleY(0.08);
+  }
+}
+
+@keyframes pip-yawn {
+  0%,
+  100% {
+    transform: scaleY(0.55);
+  }
+  30%,
+  55% {
+    transform: scaleY(1.25) translateY(2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pip-character * {
+    animation: none !important;
+    transition: opacity 180ms ease !important;
+  }
+
+  .monitor-mascot .pip-body-posture,
+  .monitor-mascot .pip-head-posture,
+  .monitor-mascot .pip-wing-posture,
+  .monitor-mascot .pip-tuft,
+  .monitor-mascot .pip-eyes-open {
+    transform: none;
+  }
+}

@@ -272,6 +272,10 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   await expect(parent.locator('audio')).toHaveCount(1);
   await expect(bedroomCard.getByText('Listening live', { exact: true })).toBeVisible();
   await parent.getByRole('button', { name: 'Switch room', exact: true }).click();
+  await expect(parent.getByRole('button', { name: 'Switch room', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
   await parent.getByRole('button', { name: 'Create a room', exact: true }).click();
   await expect(parent.locator('audio')).toHaveCount(0);
   await parent.getByLabel('Room name').fill('Travel room');
@@ -287,10 +291,12 @@ test('real baby + two parents: pairing, received audio packets, sound alert, net
   await expect(bedroomCard.getByText('Listening live', { exact: true })).toBeVisible();
   await baby.getByRole('button', { name: 'Pause monitoring' }).click();
   await parent.getByRole('link', { name: 'Settings', exact: true }).click();
-  await parent.getByRole('button', { name: 'Switch to dark mode' }).click();
+  await parent.emulateMedia({ colorScheme: 'dark' });
   await parent.getByRole('link', { name: 'Monitor', exact: true }).click();
   await parent.getByRole('button', { name: 'Dim screen', exact: true }).click();
-  await expect(parent.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect
+    .poll(() => parent.evaluate(() => getComputedStyle(document.documentElement).colorScheme))
+    .toBe('dark');
   await expect(parent.locator('html')).toHaveAttribute('data-dim', 'true');
   await parent.setViewportSize({ width: 390, height: 844 });
   await parent.screenshot({ path: 'artifacts/parent-dark-dim.png', animations: 'disabled' });
@@ -374,8 +380,15 @@ test('first-run layout, keyboard dialog, invalid invite and denied microphone', 
   await page.screenshot({ path: 'artifacts/welcome-mobile.png', fullPage: true });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.screenshot({ path: 'artifacts/welcome-desktop.png', fullPage: true });
-  await page.getByRole('button', { name: 'Get the app' }).click();
+  await expect(page.getByRole('link', { name: 'Open Pip' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Get the app' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Privacy', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('dialog')).not.toContainText('prototype');
+  await expect(page.getByRole('link', { name: 'Source code' })).toHaveAttribute(
+    'href',
+    'https://github.com/carlassmann/babyphone',
+  );
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await page.getByRole('button', { name: 'Join a room' }).click();
@@ -455,9 +468,11 @@ test('first-run layout, keyboard dialog, invalid invite and denied microphone', 
   await page.getByRole('button', { name: 'Manage this device', exact: true }).click();
   await page.getByRole('button', { name: 'Leave this room' }).click();
   await expect(page.getByRole('button', { name: 'Create a room' })).toBeVisible();
-  await page.getByRole('button', { name: 'Switch to dark mode' }).click();
+  await page.emulateMedia({ colorScheme: 'dark' });
   await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect
+    .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme))
+    .toBe('dark');
   const manager = await (
     await page.request.post('/api/register', {
       data: { role: 'parent', name: 'Manager', roomKey: previous.roomKey },
