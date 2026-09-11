@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   CheckIcon,
   CopyIcon,
@@ -105,6 +106,7 @@ export function DeviceSettingsModal({
 }) {
   const isBaby = session.role === 'baby';
   const otherDevices = devices.filter((device) => device.id !== session.deviceId);
+  const [devicePendingRemoval, setDevicePendingRemoval] = useState<PublicDevice | null>(null);
 
   return (
     <Modal title="Device settings" close={onClose}>
@@ -125,12 +127,12 @@ export function DeviceSettingsModal({
         <DisclosureIcon size={17} />
       </button>
       <p className="caption">Switching roles pauses monitoring and stops live audio.</p>
-      {!isBaby && (
+      {otherDevices.length > 0 && (
         <>
           <hr />
           <h3>Room access</h3>
           <p className="caption">
-            Any parent can remove devices. Removal also resets the invitation link. Existing devices
+            Any device can remove devices. Removal also resets the invitation link. Existing devices
             stay connected.
           </p>
           {otherDevices.map((device) => (
@@ -152,7 +154,7 @@ export function DeviceSettingsModal({
                 type="button"
                 className="quiet danger"
                 disabled={busy || !connected}
-                onClick={() => onRemoveDevice(device.id)}
+                onClick={() => setDevicePendingRemoval(device)}
                 aria-label={`Remove ${device.name}`}
               >
                 Remove
@@ -166,11 +168,49 @@ export function DeviceSettingsModal({
           )}
         </>
       )}
+      {devicePendingRemoval && (
+        <RemoveDeviceConfirmation
+          device={devicePendingRemoval}
+          busy={busy}
+          onCancel={() => setDevicePendingRemoval(null)}
+          onConfirm={() => {
+            onRemoveDevice(devicePendingRemoval.id);
+            setDevicePendingRemoval(null);
+          }}
+        />
+      )}
       <hr />
       <button type="button" className="quiet danger" disabled={busy} onClick={onLeave}>
         Leave this room <ForwardIcon size={16} />
       </button>
       <p className="caption">You’ll need the invitation code to join again.</p>
+    </Modal>
+  );
+}
+
+function RemoveDeviceConfirmation({
+  device,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  device: PublicDevice;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Modal title={`Remove ${device.name}?`} close={onCancel}>
+      <p>
+        {device.name} loses access to this room right away. The invitation link is reset, so it can
+        only rejoin with a new invitation.
+      </p>
+      <button type="button" className="primary full danger" disabled={busy} onClick={onConfirm}>
+        Remove {device.name}
+      </button>
+      <button type="button" className="secondary full" onClick={onCancel}>
+        Keep this device
+      </button>
     </Modal>
   );
 }

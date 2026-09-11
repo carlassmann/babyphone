@@ -146,7 +146,7 @@ export class Room extends DurableObject<Env> {
       }
 
       if (path === '/api/reset-invitation' || path === '/api/remove-device') {
-        if (device.role !== 'parent')
+        if (path === '/api/reset-invitation' && device.role !== 'parent')
           throw new RequestError('Use a parent device to manage access.', 403);
         const target =
           path === '/api/remove-device' ? this.get<Device>('device', body.target) : undefined;

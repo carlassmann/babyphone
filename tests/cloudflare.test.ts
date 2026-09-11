@@ -288,7 +288,7 @@ test(
       guestConnection.socket.addEventListener('close', () => {
         guestClosed = true;
       });
-      assert.equal((await post('remove-device', { ...baby, target: second.deviceId })).status, 403);
+      assert.equal((await post('remove-device', { ...baby, target: baby.deviceId })).status, 400);
       assert.equal(
         (await post('remove-device', { ...outsider, target: second.deviceId })).status,
         400,
@@ -298,7 +298,7 @@ test(
         400,
       );
       assert.equal((await post('reset-invitation', baby)).status, 403);
-      const removal = await post('remove-device', { ...parent, target: second.deviceId });
+      const removal = await post('remove-device', { ...baby, target: second.deviceId });
       assert.equal(removal.status, 200);
       const replacement = (await removal.json()) as { roomKey: string };
       await eventually(async () => guestClosed);

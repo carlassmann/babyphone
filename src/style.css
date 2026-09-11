@@ -1355,6 +1355,20 @@ hr {
 .danger {
   color: var(--danger);
 }
+.primary.danger {
+  color: var(--surface);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--danger) 85%, white), var(--danger));
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 22%) inset,
+    0 0 0 0.5px color-mix(in srgb, var(--danger) 70%, #000),
+    var(--shadow-1);
+}
+@media (hover: hover) and (pointer: fine) {
+  .primary.danger:hover {
+    background: linear-gradient(180deg, var(--danger), color-mix(in srgb, var(--danger) 80%, #000));
+    transform: translateY(-1px);
+  }
+}
 
 [data-sonner-toaster][data-sonner-theme] {
   font-family: inherit;
