@@ -1,4 +1,13 @@
-import { AlertIcon, CheckIcon, DeviceIcon, ForwardIcon } from '../../../icons';
+import {
+  AlertIcon,
+  BabyIcon,
+  CheckIcon,
+  DeviceIcon,
+  DisclosureIcon,
+  ForwardIcon,
+  RoomIcon,
+  type IconComponent,
+} from '../../../icons';
 import { request } from '../../../connection';
 import { RenameField } from '../parts/room-components';
 import { useRoom } from '../room-context';
@@ -9,27 +18,56 @@ export function SettingsScreen() {
   return (
     <>
       {!room.isBaby && (
-        <section className="side-card">
-          <h3>Room</h3>
+        <SettingsCard icon={RoomIcon} title="Room">
           <RenameField
             label="Room name"
             value={room.session.roomName}
             onSave={(name) => request('rename-room', { ...room.session, name })}
           />
-        </section>
+        </SettingsCard>
       )}
-      <section className="side-card connection-card">
-        <div className="section-icon">
-          <AlertIcon size={22} />
-        </div>
-        <h3>{room.isBaby ? 'Device setup' : 'Notifications'}</h3>
-        {room.isBaby ? <BabySetup /> : <NotificationSetup room={room} />}
+      {room.isBaby ? (
+        <SettingsCard icon={BabyIcon} title="Device setup">
+          <BabySetup />
+        </SettingsCard>
+      ) : (
+        <SettingsCard icon={AlertIcon} title="Notifications">
+          <NotificationSetup room={room} />
+        </SettingsCard>
+      )}
+      <section className="side-card settings-links">
+        <button type="button" className="settings-link" onClick={room.openSettings}>
+          <span className="card-icon">
+            <DeviceIcon size={19} />
+          </span>
+          <span>Manage this device</span>
+          <DisclosureIcon size={18} />
+        </button>
+        {room.preferences}
       </section>
-      <button type="button" className="secondary full" onClick={room.openSettings}>
-        <DeviceIcon size={19} /> Manage this device
-      </button>
-      {room.preferences}
     </>
+  );
+}
+
+function SettingsCard({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: IconComponent;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="side-card settings-card">
+      <header className="card-heading">
+        <span className="card-icon">
+          <Icon size={19} />
+        </span>
+        <h3>{title}</h3>
+      </header>
+      {children}
+    </section>
   );
 }
 
@@ -37,15 +75,17 @@ function BabySetup() {
   return (
     <>
       <p>Keep this device plugged in, with Pip open in the foreground.</p>
-      <div className="check-row">
-        <CheckIcon size={17} weight="bold" /> Volume is analyzed here
-      </div>
-      <div className="check-row">
-        <CheckIcon size={17} weight="bold" /> No audio is saved
-      </div>
-      <div className="check-row">
-        <CheckIcon size={17} weight="bold" /> Parents can listen anytime
-      </div>
+      <ul className="check-list">
+        <li>
+          <CheckIcon size={17} weight="bold" /> Volume is analyzed here
+        </li>
+        <li>
+          <CheckIcon size={17} weight="bold" /> No audio is saved
+        </li>
+        <li>
+          <CheckIcon size={17} weight="bold" /> Parents can listen anytime
+        </li>
+      </ul>
     </>
   );
 }

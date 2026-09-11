@@ -8,6 +8,7 @@ import { ApiError, request } from './connection';
 import type { Session } from './protocol';
 import { readSession, readRooms, sessionsEqual, storeActive, storeRooms } from './sessions';
 import { InvitationModal, PrivacyModal, RoomsPopover } from './AppModals';
+import { DisclosureIcon, PrivacyIcon } from './icons';
 
 type AppModal = '' | 'privacy';
 
@@ -277,11 +278,13 @@ export function AppScreen() {
         roomSwitcher={roomSwitcher}
         updateSession={updateSession}
         preferences={
-          <section className="side-card preferences">
-            <button type="button" className="quiet full" onClick={() => setModal('privacy')}>
-              Privacy
-            </button>
-          </section>
+          <button type="button" className="settings-link" onClick={() => setModal('privacy')}>
+            <span className="card-icon">
+              <PrivacyIcon size={19} />
+            </span>
+            <span>Privacy</span>
+            <DisclosureIcon size={18} />
+          </button>
         }
       />
     );

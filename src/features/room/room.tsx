@@ -107,6 +107,18 @@ export function Room({
       setError(errorMessage(error));
     }
   }
+  async function toggleMute(target: string) {
+    const device = devices.find(({ id }) => id === target);
+    try {
+      await request('mute', {
+        ...session,
+        target,
+        muted: !device?.mutedBy.includes(session.deviceId),
+      });
+    } catch (error) {
+      setError(errorMessage(error));
+    }
+  }
   async function clearEvents() {
     try {
       await request('clear-events', session);
@@ -317,8 +329,16 @@ export function Room({
   function resumeAudio(deviceId: string) {
     void callsRef.current?.resume(deviceId).catch((error) => setError(errorMessage(error)));
   }
-  const latestEvent = recentEvent(events, dismissedEventsThrough, Date.now(), RECENT_EVENT_MS);
   const babies = devices.filter((device) => device.role === 'baby');
+  const mutedBabies = babies
+    .filter((device) => device.mutedBy.includes(session.deviceId))
+    .map((device) => device.id);
+  const latestEvent = recentEvent(
+    events.filter((event) => !mutedBabies.includes(event.deviceId)),
+    dismissedEventsThrough,
+    Date.now(),
+    RECENT_EVENT_MS,
+  );
   const parents = devices.filter((device) => device.role === 'parent' && device.online);
   return (
     <main className="room">
@@ -363,6 +383,7 @@ export function Room({
               events,
               isBaby,
               level,
+              mutedBabies,
               parents,
               preferences,
               pushEnabled: push,
@@ -379,6 +400,7 @@ export function Room({
               stopListening: (deviceId) => callsRef.current?.stop(deviceId),
               testNotification,
               toggleDim: () => setDim(!dim),
+              toggleMute,
               toggleMonitoring,
             }}
           >

@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Bell,
   BellRinging,
+  BellSlash,
   CaretDown,
   CaretRight,
   Check,
@@ -11,11 +12,13 @@ import {
   DeviceMobile,
   GearSix,
   Headphones,
+  House,
   LinkSimple,
   Microphone,
   MoonStars,
   Pause,
   Plus,
+  ShieldCheck,
   Sun,
   SunDim,
   Waveform,
@@ -36,12 +39,15 @@ export const BackIcon = ArrowLeft;
 export const ForwardIcon = ArrowRight;
 export const AlertIcon = Bell;
 export const AlertActiveIcon = BellRinging;
+export const AlertMutedIcon = BellSlash;
 export const ExpandIcon = CaretDown;
 export const DisclosureIcon = CaretRight;
 export const CheckIcon = Check;
 export const CopyIcon = Copy;
 export const DeviceIcon = DeviceMobile;
 export const SettingsIcon = GearSix;
+export const RoomIcon = House;
+export const PrivacyIcon = ShieldCheck;
 export const ParentIcon = Headphones;
 export const InviteLinkIcon = LinkSimple;
 export const MicrophoneIcon = Microphone;

@@ -180,6 +180,19 @@ export class Room extends DurableObject<Env> {
         this.broadcast();
         return json({ ok: true });
       }
+      if (path === '/api/mute') {
+        const target = this.get<Device>('device', body.target);
+        if (device.role !== 'parent' || !target || target.role !== 'baby')
+          throw new RequestError('That baby device is unavailable.', 403);
+        if (typeof body.muted !== 'boolean') throw new RequestError('Invalid mute setting.');
+        const muted = new Set(device.mutedBabies ?? []);
+        if (body.muted) muted.add(target.id);
+        else muted.delete(target.id);
+        device.mutedBabies = [...muted];
+        this.put('device', device.id, device);
+        this.broadcast();
+        return json({ ok: true });
+      }
       if (path === '/api/clear-events') {
         if (device.role !== 'parent')
           throw new RequestError('Use a parent device to clear activity.', 403);
@@ -344,6 +357,7 @@ export class Room extends DurableObject<Env> {
     const payload = alertPayload(event);
     for (const parent of this.all<Device>('device')) {
       if (parent.role !== 'parent' || !parent.subscription) continue;
+      if (parent.mutedBabies?.includes(device.id)) continue;
       const id = event.id + ':' + parent.id;
       this.put('delivery', id, {
         id,
@@ -358,12 +372,17 @@ export class Room extends DurableObject<Env> {
   }
   private state() {
     const now = Date.now();
+    const devices = this.all<Device>('device');
+    const mutedBy = (babyId: string) =>
+      devices
+        .filter((parent) => parent.role === 'parent' && parent.mutedBabies?.includes(babyId))
+        .map((parent) => parent.id);
     return {
       type: 'state',
       roomKey: this.get<string>('room', 'invitation'),
       roomName: this.get<string>('room', 'name'),
       at: now,
-      devices: this.all<Device>('device').map(
+      devices: devices.map(
         ({ id, name, role, lastSeen, monitoring, level, lastNoise, sensitivity }) => ({
           id,
           name,
@@ -374,6 +393,7 @@ export class Room extends DurableObject<Env> {
           level,
           lastNoise,
           sensitivity: sensitivity ?? 2,
+          mutedBy: role === 'baby' ? mutedBy(id) : [],
         }),
       ),
       events: this.all<Alert>('event')

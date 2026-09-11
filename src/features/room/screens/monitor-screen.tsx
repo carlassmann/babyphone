@@ -1,4 +1,6 @@
 import {
+  AlertIcon,
+  AlertMutedIcon,
   BabyIcon,
   BrightIcon,
   DimIcon,
@@ -9,6 +11,7 @@ import {
   SoundIcon,
 } from '../../../icons';
 import { relativeTime } from '../../../format';
+import type { PublicDevice } from '../../../protocol';
 import { AudioMeter } from '../parts/room-components';
 import { useRoom } from '../room-context';
 import { SENSITIVITY_THRESHOLDS } from '../../../noise';
@@ -146,6 +149,7 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
 
   return (
     <div className="device-list">
+      <NestSummary room={room} />
       {room.babies.map((device) => (
         <article className="device-card" key={device.id}>
           <div className="device-heading">
@@ -180,24 +184,27 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
                 ? `Last sound ${relativeTime(device.lastNoise)}`
                 : 'No sounds detected yet'}
             </span>
-            {isListening(room.audioStatuses[device.id]) ? (
-              <button
-                type="button"
-                className="secondary small"
-                onClick={() => room.stopListening(device.id)}
-              >
-                <PauseIcon size={17} weight="fill" /> Stop listening
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="primary small"
-                disabled={!room.connected || !device.monitoring}
-                onClick={() => room.listenTo(device.id)}
-              >
-                <ParentIcon size={18} /> Listen
-              </button>
-            )}
+            <div className="device-actions">
+              <MuteToggle room={room} device={device} />
+              {isListening(room.audioStatuses[device.id]) ? (
+                <button
+                  type="button"
+                  className="secondary small"
+                  onClick={() => room.stopListening(device.id)}
+                >
+                  <PauseIcon size={17} weight="fill" /> Stop listening
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="primary small"
+                  disabled={!room.connected || !device.monitoring}
+                  onClick={() => room.listenTo(device.id)}
+                >
+                  <ParentIcon size={18} /> Listen
+                </button>
+              )}
+            </div>
           </div>
           {room.audioStatuses[device.id] && (
             <div className="audio-status" role="status">
@@ -214,6 +221,54 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
       ))}
       {listening && <DimControl room={room} />}
     </div>
+  );
+}
+
+function NestSummary({ room }: { room: ReturnType<typeof useRoom> }) {
+  const watched = room.connected
+    ? room.babies.filter((device) => device.online && device.monitoring)
+    : [];
+  const noisy = watched.filter(
+    (device) => device.level >= SENSITIVITY_THRESHOLDS[device.sensitivity - 1]!,
+  );
+  const state = watched.length === 0 ? 'paused' : noisy.length > 0 ? 'sound' : 'quiet';
+  const nest = watched.length === 1 ? watched[0]!.name : 'the nest';
+
+  return (
+    <section className="nest-summary">
+      <PipMascot state={state} alt="Pip watching over the nest" />
+      <h2>
+        {state === 'sound'
+          ? 'A little sound'
+          : state === 'quiet'
+            ? 'All quiet'
+            : 'Nobody listening'}
+      </h2>
+      <p>
+        {state === 'sound'
+          ? `${noisy.length === 1 ? noisy[0]!.name : 'A baby device'} is picking up some noise.`
+          : state === 'quiet'
+            ? `Pip is keeping watch over ${nest}.`
+            : 'Start monitoring on the baby device so Pip can listen in.'}
+      </p>
+    </section>
+  );
+}
+
+function MuteToggle({ room, device }: { room: ReturnType<typeof useRoom>; device: PublicDevice }) {
+  const muted = room.mutedBabies.includes(device.id);
+
+  return (
+    <button
+      type="button"
+      className="quiet small mute-toggle"
+      aria-pressed={muted}
+      disabled={!room.connected}
+      onClick={() => void room.toggleMute(device.id)}
+    >
+      {muted ? <AlertMutedIcon size={17} /> : <AlertIcon size={17} />}
+      {muted ? 'Alerts muted' : 'Mute alerts'}
+    </button>
   );
 }
 

@@ -225,9 +225,34 @@ test(
           (message) => message.type === 'signal' && message.payload.callId === 'good',
         ),
       );
+      assert.equal(
+        (await post('mute', { ...baby, target: baby.deviceId, muted: true })).status,
+        403,
+      );
+      assert.equal(
+        (await post('mute', { ...second, target: parent.deviceId, muted: true })).status,
+        403,
+      );
+      assert.equal(
+        (await post('mute', { ...second, target: baby.deviceId, muted: 'yes' })).status,
+        400,
+      );
+      assert.equal(
+        (await post('mute', { ...second, target: baby.deviceId, muted: true })).status,
+        200,
+      );
+      const muted = (await (await post('state', second)).json()) as any;
+      assert.deepEqual(muted.devices.find((device: any) => device.id === baby.deviceId).mutedBy, [
+        second.deviceId,
+      ]);
       babyClient.send({ type: 'noise' });
       babyClient.send({ type: 'noise' });
-      await eventually(async () => attempts.get('/retry') === 1 && attempts.get('/gone') === 1);
+      await eventually(async () => attempts.get('/retry') === 1);
+      assert.equal(attempts.get('/gone'), undefined);
+      assert.equal(
+        (await post('mute', { ...second, target: baby.deviceId, muted: false })).status,
+        200,
+      );
       const initial = (await (await post('state', parent)).json()) as any;
       assert.equal(initial.events.filter((event: any) => event.kind === 'noise').length, 1);
       assert.equal(JSON.stringify(initial).includes('tokenHash'), false);

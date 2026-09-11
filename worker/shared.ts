@@ -26,6 +26,7 @@ export type Device = {
   level: number;
   lastNoise: number;
   sensitivity?: number;
+  mutedBabies?: string[];
   subscription?: PushSubscription;
 };
 export type Delivery = {
@@ -55,6 +56,7 @@ export type RequestBody = {
   roomKey: string;
   roomName: unknown;
   sensitivity: number;
+  muted: unknown;
   subscription: unknown;
   target: string;
   token: unknown;

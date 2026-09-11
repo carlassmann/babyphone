@@ -12,6 +12,7 @@ export type RoomModel = {
   events: Alert[];
   isBaby: boolean;
   level: number;
+  mutedBabies: string[];
   parents: PublicDevice[];
   preferences: ReactNode;
   pushEnabled: boolean;
@@ -28,6 +29,7 @@ export type RoomModel = {
   stopListening: (deviceId: string) => void;
   testNotification: () => Promise<void>;
   toggleDim: () => void;
+  toggleMute: (deviceId: string) => Promise<void>;
   toggleMonitoring: () => Promise<void>;
 };
 

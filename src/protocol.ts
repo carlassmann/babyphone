@@ -17,6 +17,7 @@ export type PublicDevice = {
   level: number;
   lastNoise: number;
   sensitivity: number;
+  mutedBy: string[];
   lastSeen: number;
 };
 export type Alert = {
