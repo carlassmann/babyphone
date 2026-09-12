@@ -16,6 +16,7 @@ Pip is a working local prototype. Nothing has been deployed.
 - Adjust each baby's saved sensitivity from any parent device.
 - View and reset room activity, with up to 30 events from the last 24 hours.
 - Install the PWA, follow the system appearance, and dim either device's screen.
+- Use Pip in English or German. Pip follows the browser language and can be switched in settings or the landing footer.
 
 Real desktop Chrome and Safari testing covered microphones, cross-browser audio, simultaneous listening, push delivery with parent tabs closed, and wake locks. Chrome installation and service-worker updates also passed. Physical locked-phone delivery and Cloudflare TURN across networks still need testing. See [test evidence](TESTING.md).
 

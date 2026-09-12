@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from './Modal';
+import { useIntl } from './intl/setup';
 
 export function InvitationScanner({
   onScan,
@@ -8,6 +9,7 @@ export function InvitationScanner({
   onScan: (code: string) => void;
   close: () => void;
 }) {
+  const t = useIntl();
   const video = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -38,7 +40,7 @@ export function InvitationScanner({
               code = new URLSearchParams(url.hash.slice(1)).get('join') || '';
             } catch {}
             if (!/^(?:[a-f0-9]{64}\.)?[A-Za-z0-9_-]{20,128}$/.test(code)) {
-              setError('This is not a Pip invitation code. Try another QR code.');
+              setError(t('scanner.invalid'));
               return;
             }
             cancelled = true;
@@ -49,8 +51,7 @@ export function InvitationScanner({
         if (cancelled) stop();
       } catch {
         stop();
-        if (!cancelled)
-          setError('Camera unavailable. Allow camera access, or close this and paste the code.');
+        if (!cancelled) setError(t('scanner.cameraUnavailable'));
       }
     }
     void start();
@@ -60,9 +61,11 @@ export function InvitationScanner({
     };
   }, [onScan]);
   return (
-    <Modal title="Scan invitation" close={close}>
+    <Modal title={t('scanner.title')} testId="scanner-dialog" close={close}>
       <video ref={video} autoPlay muted playsInline className="invitation-camera" />
-      <p role="status">{error || 'Point your camera at the invitation QR code.'}</p>
+      <p role="status" data-testid="scanner-status" data-state={error ? 'error' : 'scanning'}>
+        {error || t('scanner.prompt')}
+      </p>
     </Modal>
   );
 }

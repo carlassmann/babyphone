@@ -440,6 +440,33 @@ footer a {
   text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
   text-underline-offset: 3px;
 }
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.language-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0;
+}
+.language-select .caption {
+  margin: 0;
+}
+.language-select select {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--surface-raised);
+  box-shadow:
+    0 0 0 var(--hairline) var(--line),
+    var(--shadow-1);
+  cursor: pointer;
+}
 
 .setup {
   width: 100%;
@@ -1662,6 +1689,10 @@ hr {
   .room-scroll {
     padding-bottom: calc(104px + env(safe-area-inset-bottom));
     scroll-padding-bottom: calc(104px + env(safe-area-inset-bottom));
+  }
+  .room-scroll:has(.room-alerts .notice) {
+    padding-bottom: calc(240px + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(240px + env(safe-area-inset-bottom));
   }
   .connection-summary {
     min-height: 58px;

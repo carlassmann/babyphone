@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { request } from './connection';
+import { useIntl } from './intl/setup';
+import { translate } from './intl/standalone';
 import type { Session } from './protocol';
 type InstallPrompt = Event & { prompt(): Promise<void>; userChoice: Promise<{ outcome: string }> };
 
@@ -9,6 +11,7 @@ const PUSH_CONFIG_TIMEOUT_MS = 8_000;
 const PUSH_SUBSCRIPTION_TIMEOUT_MS = 12_000;
 
 export function usePwa() {
+  const t = useIntl();
   const [prompt, setPrompt] = useState<InstallPrompt>();
   const [waiting, setWaiting] = useState<ServiceWorker>();
   const [installed, setInstalled] = useState(
@@ -28,16 +31,16 @@ export function usePwa() {
   }, [waiting]);
   useEffect(() => {
     if (!waiting) return;
-    toast('Pip update available', {
+    toast(t('pwa.updateTitle'), {
       id: 'pip-update',
       duration: Infinity,
-      description: updateBlocked ? 'Pause monitoring and listening before updating.' : undefined,
-      action: updateBlocked ? undefined : { label: 'Update', onClick: update },
+      description: updateBlocked ? t('pwa.updateBlocked') : undefined,
+      action: updateBlocked ? undefined : { label: t('pwa.updateAction'), onClick: update },
     });
     return () => {
       toast.dismiss('pip-update');
     };
-  }, [waiting, updateBlocked, update]);
+  }, [waiting, updateBlocked, update, t]);
   useEffect(() => {
     const install = (event: Event) => {
       event.preventDefault();
@@ -72,7 +75,7 @@ export function usePwa() {
           });
           check();
         })
-        .catch(() => setError('Offline installation is unavailable. Reload while connected.'));
+        .catch(() => setError(t('pwa.offlineUnavailable')));
     return () => {
       cancelled = true;
       document.removeEventListener('visibilitychange', check);
@@ -103,19 +106,14 @@ export function usePwa() {
 }
 export async function enableNotifications(session: Session) {
   if (!('Notification' in window) || !('PushManager' in window))
-    throw new Error(
-      'On iPhone or iPad, add Pip to your Home Screen, then open it there to enable alerts.',
-    );
+    throw new Error(translate()('pwa.iosHint'));
   const permission = await Notification.requestPermission();
-  if (permission !== 'granted')
-    throw new Error(
-      'Notifications are blocked. Allow them in your browser or device settings, then try again.',
-    );
+  if (permission !== 'granted') throw new Error(translate()('pwa.blocked'));
   const registration = await Promise.race([
     navigator.serviceWorker.ready,
     new Promise<never>((_, reject) =>
       setTimeout(
-        () => reject(new Error('Installation is still getting ready. Reload and try again.')),
+        () => reject(new Error(translate()('pwa.gettingReady'))),
         SERVICE_WORKER_READY_TIMEOUT_MS,
       ),
     ),
@@ -124,7 +122,7 @@ export async function enableNotifications(session: Session) {
     signal: AbortSignal.timeout(PUSH_CONFIG_TIMEOUT_MS),
   });
   const { pushKey } = await response.json();
-  if (!pushKey) throw new Error('Push notifications are not configured on this server.');
+  if (!pushKey) throw new Error(translate()('pwa.notConfigured'));
   const existing = await registration.pushManager.getSubscription();
   const existingKey = existing?.options.applicationServerKey;
   const key = Uint8Array.from(atob(pushKey.replace(/-/g, '+').replace(/_/g, '/')), (char) =>
@@ -151,11 +149,7 @@ async function withTimeout<T>(operation: Promise<T>, duration: number): Promise<
     return await Promise.race([
       operation,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () =>
-            reject(new Error('Notification setup timed out. Check your connection and try again.')),
-          duration,
-        );
+        timer = setTimeout(() => reject(new Error(translate()('pwa.timeout'))), duration);
       }),
     ]);
   } finally {

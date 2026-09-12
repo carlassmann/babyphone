@@ -35,9 +35,9 @@ test('scan an invitation and release the camera; cancel and permission denial al
     { image },
   );
   await page.goto('/app/join');
-  await page.getByRole('button', { name: 'Scan QR code' }).click();
-  await expect(page.getByLabel('Invitation code', { exact: true })).toHaveValue(code);
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByTestId('scan-qr').click();
+  await expect(page.getByTestId('invitation-code')).toHaveValue(code);
+  await expect(page.getByTestId('scanner-dialog')).toHaveCount(0);
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -50,9 +50,9 @@ test('scan an invitation and release the camera; cancel and permission denial al
   await page.evaluate(() => {
     (window as any).blankCamera = true;
   });
-  await page.getByRole('button', { name: 'Scan QR code' }).click();
+  await page.getByTestId('scan-qr').click();
   await expect.poll(() => page.evaluate(() => (window as any).cameraTracks.length)).toBe(2);
-  await page.getByRole('button', { name: 'Close dialog' }).click();
+  await page.getByTestId('close-dialog').click();
   await expect(page).toHaveURL(/\/app\/join$/);
   await expect
     .poll(() =>
@@ -66,8 +66,8 @@ test('scan an invitation and release the camera; cancel and permission denial al
   await page.evaluate(() => {
     (window as any).denyCamera = true;
   });
-  await page.getByRole('button', { name: 'Scan QR code' }).click();
-  await expect(page.getByRole('status')).toContainText('Camera unavailable');
-  await page.getByRole('button', { name: 'Close dialog' }).click();
-  await page.getByLabel('Invitation code', { exact: true }).fill('manual-code');
+  await page.getByTestId('scan-qr').click();
+  await expect(page.getByTestId('scanner-status')).toHaveAttribute('data-state', 'error');
+  await page.getByTestId('close-dialog').click();
+  await page.getByTestId('invitation-code').fill('manual-code');
 });

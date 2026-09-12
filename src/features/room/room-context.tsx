@@ -1,10 +1,11 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import type { Alert, PublicDevice, Session } from '../../protocol';
+import type { AudioStatus } from './lib/audio-calls';
 
 export type RoomModel = {
   accessNotice: string;
   active: boolean;
-  audioStatuses: Record<string, string>;
+  audioStatuses: Record<string, AudioStatus>;
   awake: boolean;
   babies: PublicDevice[];
   busy: boolean;

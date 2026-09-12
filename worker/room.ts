@@ -16,6 +16,8 @@ import {
   failure,
 } from './shared';
 import { validSubscription, sendPush } from './push';
+import { serverError, serverLocale, serverPush, type ServerPushKey } from './intl';
+import type { Locale } from '../src/intl/locale';
 
 const UNAUTHENTICATED_CONNECTION_LIMIT = 8;
 const AUTHENTICATION_TIMEOUT_MS = 5_000;
@@ -28,40 +30,23 @@ const DELIVERY_LIFETIME_MS = 60_000;
 const ICE_CACHE_MS = 300_000;
 
 function pushDeliveryError(status: number) {
-  if (status === 401 || status === 403) {
-    return new RequestError(
-      'Push server authentication failed. Check the server VAPID keys and contact URL.',
-      502,
-    );
-  }
-  if (status === 404 || status === 410) {
-    return new RequestError(
-      'This notification subscription expired. Enable notifications again.',
-      502,
-    );
-  }
-  return new RequestError('The push service is temporarily unavailable. Try the test again.', 502);
+  if (status === 401 || status === 403) return new RequestError('error.pushAuthFailed', 502);
+  if (status === 404 || status === 410) return new RequestError('error.pushExpired', 502);
+  return new RequestError('error.pushUnavailable', 502);
 }
 
-function alertPayload(event: Alert) {
-  const copy = {
-    noise: {
-      title: 'A little sound',
-      detail: ' detected noise.',
-    },
-    paused: {
-      title: 'Monitoring paused',
-      detail: ' stopped monitoring.',
-    },
-    offline: {
-      title: 'Check your baby device',
-      detail: ' lost its connection. Check on your baby.',
-    },
-  } satisfies Record<Alert['kind'], { title: string; detail: string }>;
+const PUSH_KEYS = {
+  noise: { title: 'push.noise.title', body: 'push.noise.body' },
+  paused: { title: 'push.paused.title', body: 'push.paused.body' },
+  offline: { title: 'push.offline.title', body: 'push.offline.body' },
+} as const satisfies Record<Alert['kind'], { title: ServerPushKey; body: ServerPushKey }>;
 
+function alertPayload(event: Alert, locale: Locale) {
+  const translate = serverPush(locale);
+  const keys = PUSH_KEYS[event.kind];
   return {
-    title: copy[event.kind].title,
-    body: event.name + copy[event.kind].detail,
+    title: translate(keys.title, {}),
+    body: translate(keys.body, { name: event.name }),
     tag: event.id,
   };
 }
@@ -99,30 +84,35 @@ export class Room extends DurableObject<Env> {
   private authenticate(id: unknown, token: unknown) {
     const device = typeof id === 'string' ? this.get<Device>('device', id) : undefined;
     if (!device || typeof token !== 'string' || device.tokenHash !== hash(token))
-      throw new RequestError('Device session expired. Join your room again.', 401);
+      throw new RequestError('error.deviceExpired', 401);
     return device;
   }
   async fetch(request: Request) {
+    let locale: Locale = 'en';
     try {
       const path = new URL(request.url).pathname;
       if (path === '/api/ws') {
         return await this.openWebSocket(request);
       }
       const body = await readBody(request);
+      locale = serverLocale(body.locale);
       if (path === '/api/register') {
         return this.register(body);
       }
       const device = this.authenticate(body.deviceId, body.token);
+      if (device.locale !== locale) {
+        device.locale = locale;
+        this.put('device', device.id, device);
+      }
       if (path === '/api/state') return json(this.state());
       if (path === '/api/rename-room' || path === '/api/rename-device') {
         if (path === '/api/rename-room') {
-          if (device.role !== 'parent')
-            throw new RequestError('Use a parent device to rename the room.', 403);
+          if (device.role !== 'parent') throw new RequestError('error.renameRoom', 403);
           this.put('room', 'name', cleanName(body.name));
         } else {
           const target = this.get<Device>('device', body.target || device.id);
           if (!target || (target.id !== device.id && device.role !== 'parent'))
-            throw new RequestError('You cannot rename that device.', 403);
+            throw new RequestError('error.renameDevice', 403);
           target.name = cleanName(body.name);
           this.put('device', target.id, target);
         }
@@ -147,11 +137,11 @@ export class Room extends DurableObject<Env> {
 
       if (path === '/api/reset-invitation' || path === '/api/remove-device') {
         if (path === '/api/reset-invitation' && device.role !== 'parent')
-          throw new RequestError('Use a parent device to manage access.', 403);
+          throw new RequestError('error.manageAccess', 403);
         const target =
           path === '/api/remove-device' ? this.get<Device>('device', body.target) : undefined;
         if (path === '/api/remove-device' && (!target || target.id === device.id))
-          throw new RequestError('Choose another device to remove.');
+          throw new RequestError('error.chooseOther');
         const roomKey = this.ctx.id.toString() + '.' + key();
         this.ctx.storage.transactionSync(() => {
           this.put('room', 'invitation', roomKey);
@@ -173,8 +163,8 @@ export class Room extends DurableObject<Env> {
           target.role !== 'baby' ||
           (device.role !== 'parent' && device.id !== target.id)
         )
-          throw new RequestError('That baby device is unavailable.', 403);
-        if (![1, 2, 3].includes(body.sensitivity)) throw new RequestError('Invalid sensitivity.');
+          throw new RequestError('error.babyUnavailable', 403);
+        if (![1, 2, 3].includes(body.sensitivity)) throw new RequestError('error.sensitivity');
         target.sensitivity = body.sensitivity;
         this.put('device', target.id, target);
         this.broadcast();
@@ -183,8 +173,8 @@ export class Room extends DurableObject<Env> {
       if (path === '/api/mute') {
         const target = this.get<Device>('device', body.target);
         if (device.role !== 'parent' || !target || target.role !== 'baby')
-          throw new RequestError('That baby device is unavailable.', 403);
-        if (typeof body.muted !== 'boolean') throw new RequestError('Invalid mute setting.');
+          throw new RequestError('error.babyUnavailable', 403);
+        if (typeof body.muted !== 'boolean') throw new RequestError('error.mute');
         const muted = new Set(device.mutedBabies ?? []);
         if (body.muted) muted.add(target.id);
         else muted.delete(target.id);
@@ -194,8 +184,7 @@ export class Room extends DurableObject<Env> {
         return json({ ok: true });
       }
       if (path === '/api/clear-events') {
-        if (device.role !== 'parent')
-          throw new RequestError('Use a parent device to clear activity.', 403);
+        if (device.role !== 'parent') throw new RequestError('error.clearActivity', 403);
         this.ctx.storage.sql.exec("DELETE FROM records WHERE kind = 'event'");
         await this.schedule();
         this.broadcast();
@@ -204,20 +193,20 @@ export class Room extends DurableObject<Env> {
 
       if (path === '/api/ice') return json(await this.ice(device.id));
       if (path === '/api/subscription') {
-        if (device.inactive)
-          throw new RequestError('Activate this room before enabling notifications.', 409);
+        if (device.inactive) throw new RequestError('error.activateFirst', 409);
         if (device.role !== 'parent' || !validSubscription(body.subscription))
-          throw new RequestError('Invalid notification subscription.');
+          throw new RequestError('error.subscription');
         device.subscription = body.subscription;
         this.put('device', device.id, device);
         return json({ ok: true });
       }
       if (path === '/api/test-push') {
         if (device.role !== 'parent' || !device.subscription)
-          throw new RequestError('Enable notifications first.');
+          throw new RequestError('error.enableFirst');
+        const translate = serverPush(locale);
         const status = await sendPush(this.env, device.subscription, {
-          title: 'Pip is all ears',
-          body: 'Your test notification arrived. Try this again with Pip in the background.',
+          title: translate('push.test.title', {}),
+          body: translate('push.test.body', {}),
           tag: 'pip-test',
         });
         if (status < 200 || status >= 300) throw pushDeliveryError(status);
@@ -225,7 +214,7 @@ export class Room extends DurableObject<Env> {
       }
       if (path === '/api/role' || path === '/api/leave') {
         if (path === '/api/role' && !['baby', 'parent'].includes(body.role))
-          throw new RequestError('Invalid role');
+          throw new RequestError('error.role');
         this.ctx.storage.transactionSync(() => {
           this.heartbeat(device, false, 0);
           if (path === '/api/leave') this.remove('device', device.id);
@@ -238,23 +227,23 @@ export class Room extends DurableObject<Env> {
         this.broadcast();
         return json({ ok: true });
       }
-      throw new RequestError('Not found', 404);
+      throw new RequestError('error.notFound', 404);
     } catch (error) {
-      return failure(error);
+      return failure(error, locale);
     }
   }
 
   private async openWebSocket(request: Request) {
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
-      throw new RequestError('WebSocket required');
+      throw new RequestError('error.websocket');
     }
-    if (!this.get('room', 'name')) throw new RequestError('Room not found', 404);
+    if (!this.get('room', 'name')) throw new RequestError('error.roomNotFound', 404);
 
     const unauthenticatedConnections = this.ctx
       .getWebSockets()
       .filter((socket) => !(socket.deserializeAttachment() as SocketSession).deviceId);
     if (unauthenticatedConnections.length >= UNAUTHENTICATED_CONNECTION_LIMIT) {
-      throw new RequestError('Too many connections', 429);
+      throw new RequestError('error.tooManyConnections', 429);
     }
 
     const [client, server] = Object.values(new WebSocketPair());
@@ -273,13 +262,13 @@ export class Room extends DurableObject<Env> {
 
   private register(body: RequestBody) {
     if (!['baby', 'parent'].includes(body.role)) {
-      throw new RequestError('Choose a device role.');
+      throw new RequestError('error.chooseRole');
     }
 
     const name = cleanName(body.name);
     let roomName = this.get<string>('room', 'name');
     if (!roomName && !body.create) {
-      throw new RequestError('Room not found. Check your invitation code.', 404);
+      throw new RequestError('error.roomNotFoundInvite', 404);
     }
 
     const invitation = this.get<string>('room', 'invitation');
@@ -288,7 +277,7 @@ export class Room extends DurableObject<Env> {
       !body.roomKey.includes('.') &&
       this.env.ROOMS.idFromName('room:' + hash(body.roomKey)).toString() === this.ctx.id.toString();
     if (invitation ? invitation !== body.roomKey : !validLegacyInvitation) {
-      throw new RequestError('Invitation expired. Ask for a new link.', 403);
+      throw new RequestError('error.invitationExpired', 403);
     }
 
     const token = key();
@@ -301,6 +290,7 @@ export class Room extends DurableObject<Env> {
       monitoring: false,
       level: 0,
       lastNoise: 0,
+      locale: serverLocale(body.locale),
     };
     this.ctx.storage.transactionSync(() => {
       if (!roomName) {
@@ -343,7 +333,7 @@ export class Room extends DurableObject<Env> {
     const now = Date.now();
     if (kind === 'noise') {
       if (device.role !== 'baby' || !device.monitoring || now - device.lastSeen > OFFLINE_MS)
-        throw new RequestError('Start monitoring before sending an alert.');
+        throw new RequestError('error.startMonitoring');
       if (now - device.lastNoise < NOISE_COOLDOWN_MS) return;
       device.lastNoise = now;
       this.put('device', device.id, device);
@@ -354,7 +344,6 @@ export class Room extends DurableObject<Env> {
       .sort((a, b) => b.at - a.at)
       .slice(30))
       this.remove('event', old.id);
-    const payload = alertPayload(event);
     for (const parent of this.all<Device>('device')) {
       if (parent.role !== 'parent' || !parent.subscription) continue;
       if (parent.mutedBabies?.includes(device.id)) continue;
@@ -363,7 +352,7 @@ export class Room extends DurableObject<Env> {
         id,
         deviceId: parent.id,
         subscription: parent.subscription,
-        payload,
+        payload: alertPayload(event, parent.locale ?? 'en'),
         expires: now + DELIVERY_LIFETIME_MS,
         nextAt: now,
         attempts: 0,
@@ -430,6 +419,7 @@ export class Room extends DurableObject<Env> {
     }
   }
   async webSocketMessage(socket: WebSocket, raw: string | ArrayBuffer) {
+    let locale: Locale = 'en';
     try {
       const session = socket.deserializeAttachment() as SocketSession;
       if (session.revoked) return;
@@ -455,8 +445,9 @@ export class Room extends DurableObject<Env> {
       }
       const message = JSON.parse(raw);
       const device = this.authenticate(session.deviceId || message.deviceId, message.token);
+      locale = device.locale ?? serverLocale(message.locale);
       if (!session.deviceId) {
-        if (message.type !== 'hello') throw new RequestError('Authenticate first.');
+        if (message.type !== 'hello') throw new RequestError('error.authenticateFirst');
         this.closeDevice(device.id, 4009, 'Device open in another tab', socket);
         session.deviceId = device.id;
         this.ctx.storage.transactionSync(() => {
@@ -470,7 +461,7 @@ export class Room extends DurableObject<Env> {
             this.heartbeat(device, message.monitoring === true, Number(message.level));
           else if (message.type === 'noise') this.alert(device, 'noise');
           else if (message.type === 'signal') this.signal(device, message.target, message.payload);
-          else throw new RequestError('Unknown message.');
+          else throw new RequestError('error.unknownMessage');
         });
       }
       session.lastMessageAt = now;
@@ -478,14 +469,15 @@ export class Room extends DurableObject<Env> {
       await this.schedule();
       this.broadcast();
     } catch (error) {
+      const translate = serverError(locale);
       this.send(
         socket,
         JSON.stringify({
           type: 'error',
           message:
             error instanceof RequestError
-              ? error.message
-              : 'Connection problem. Reconnect and try again.',
+              ? translate(error.key)
+              : translate('error.connectionProblem'),
         }),
       );
       if (error instanceof RequestError && error.status === 401)
@@ -503,20 +495,19 @@ export class Room extends DurableObject<Env> {
   private signal(source: Device, targetId: string, payload: Signal) {
     const target = this.get<Device>('device', targetId);
     if (!target && (payload?.kind === 'stop' || payload?.kind === 'ice')) return;
-    if (!target || target.role === source.role)
-      throw new RequestError('That device is unavailable.');
+    if (!target || target.role === source.role) throw new RequestError('error.deviceUnavailable');
     if (
       !payload ||
       !['offer', 'answer', 'ice', 'stop'].includes(payload.kind) ||
       typeof payload.callId !== 'string' ||
       payload.callId.length > 100
     )
-      throw new RequestError('Invalid audio connection message.');
+      throw new RequestError('error.audioMessage');
     if (
       payload.kind === 'offer' &&
       (source.role !== 'parent' || !target.monitoring || Date.now() - target.lastSeen > OFFLINE_MS)
     )
-      throw new RequestError('The baby device is not monitoring.');
+      throw new RequestError('error.notMonitoring');
     const sockets = this.ctx.getWebSockets().filter((socket) => {
       const session = socket.deserializeAttachment() as SocketSession;
       return (
@@ -526,7 +517,7 @@ export class Room extends DurableObject<Env> {
       );
     });
     if (!sockets.length && ['stop', 'ice'].includes(payload.kind)) return;
-    if (!sockets.length) throw new RequestError('That device is unavailable.');
+    if (!sockets.length) throw new RequestError('error.deviceUnavailable');
     for (const socket of sockets)
       this.send(socket, JSON.stringify({ type: 'signal', source: source.id, payload }));
   }
@@ -646,10 +637,9 @@ export class Room extends DurableObject<Env> {
         signal: AbortSignal.timeout(5000),
       },
     );
-    if (!response.ok) throw new RequestError('Audio relay unavailable. Try again.', 502);
+    if (!response.ok) throw new RequestError('error.relayUnavailable', 502);
     const result = (await response.json()) as { iceServers: RTCIceServer[] };
-    if (!Array.isArray(result.iceServers))
-      throw new RequestError('Audio relay configuration unavailable.', 502);
+    if (!Array.isArray(result.iceServers)) throw new RequestError('error.relayConfig', 502);
     const iceServers = result.iceServers.map((server) => ({
       ...server,
       urls: (Array.isArray(server.urls) ? server.urls : [server.urls]).filter(

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 test('production shell survives offline reload without claiming monitoring; browser push handler displays an alert', async ({
   browser,
 }) => {
-  const context = await browser.newContext({ permissions: ['notifications'] });
+  const context = await browser.newContext({ permissions: ['notifications'], locale: 'en-US' });
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
   let registrationId = '';
@@ -18,17 +18,20 @@ test('production shell survives offline reload without claiming monitoring; brow
   });
   await expect.poll(() => registrationId).not.toBe('');
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
-  await page.getByRole('button', { name: 'Create a room' }).click();
-  await page.getByRole('button', { name: 'Create room', exact: true }).click();
-  await expect(page.getByText('Connected', { exact: true })).toBeVisible();
+  await page.getByTestId('create-room').click();
+  await page.getByTestId('submit-room').click();
+  await expect(page.getByTestId('connection-status')).toHaveAttribute('data-status', 'connected');
   await expect(page).toHaveURL('http://localhost:4311/app');
   await context.setOffline(true);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Our little nest' })).toBeVisible();
-  await expect(page.getByRole('alert')).toContainText('Connection unavailable');
-  await expect(page.getByText('Connected', { exact: true })).not.toBeVisible();
+  await expect(page.getByTestId('room-title')).toBeVisible();
+  await expect(page.getByTestId('connection-notice')).toHaveAttribute('data-status', 'lost');
+  await expect(page.getByTestId('connection-status')).not.toHaveAttribute(
+    'data-status',
+    'connected',
+  );
   await context.setOffline(false);
-  await expect(page.getByText('Connected', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('connection-status')).toHaveAttribute('data-status', 'connected');
   await cdp.send('ServiceWorker.deliverPushMessage', {
     origin: 'http://localhost:4311',
     registrationId,

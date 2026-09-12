@@ -5,6 +5,7 @@
     "": {
       "name": "babyphone",
       "dependencies": {
+        "@ccssmnn/intl": "^0.1.1",
         "@fontsource/dm-sans": "^5.3.0",
         "@fontsource/fredoka": "^5.3.0",
         "@phosphor-icons/react": "^2.1.10",
@@ -38,6 +39,8 @@
     },
   },
   "packages": {
+    "@ccssmnn/intl": ["@ccssmnn/intl@0.1.1", "", { "dependencies": { "messageformat": "4.0.0-13" }, "peerDependencies": { "react": "^17.0.0 || ^18.0.0 || ^19.0.0" } }, "sha512-bS+Pj92IxrRxFSA1rto94LpxwqdfPWKuTHjTdyvQrBBfL0AL8qQM/+PHJDvtMQ6udBdW7gGtDZE+UMrzu9ckdw=="],
+
     "@cloudflare/kv-asset-handler": ["@cloudflare/kv-asset-handler@0.5.0", "", {}, "sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg=="],
 
     "@cloudflare/unenv-preset": ["@cloudflare/unenv-preset@2.16.1", "", { "peerDependencies": { "unenv": "2.0.0-rc.24", "workerd": ">1.20260305.0 <2.0.0-0" }, "optionalPeers": ["workerd"] }, "sha512-ECxObrMfyTl5bhQf/lZCXwo5G6xX9IAUo+nDMKK4SZ8m4Jvvxp52vilxyySSWh2YTZz8+HQ07qGH/2rEom1vDw=="],
@@ -443,6 +446,8 @@
     "lightningcss-win32-x64-msvc": ["lightningcss-win32-x64-msvc@1.33.0", "", { "os": "win32", "cpu": "x64" }, "sha512-OlEICDx/Xl0FqSp4bry8zFnCvGpig3Gl4gCquvYwHuqJKEC1+n9NgDniFvqHGmMv1ZkqDJrDqKKSykTDX+ehuA=="],
 
     "locate-path": ["locate-path@5.0.0", "", { "dependencies": { "p-locate": "^4.1.0" } }, "sha512-t7hw9pI+WvuwNJXwk5zVHpyhIqzg2qTlklJOf0mVxGSbe3Fp2VieZcduNYjaLDoy6p9uGpQEGWG87WpMKlNq8g=="],
+
+    "messageformat": ["messageformat@4.0.0-13", "", {}, "sha512-MpP95/VX/5pvsLOLcrDFSS3z5kmhOGL92npbM+D9N3O/qWnfl1yu0i2QbbnXzU91U0i2CruhNRdU6rgx5+bKVw=="],
 
     "miniflare": ["miniflare@5.20260831.0-alpha", "", { "dependencies": { "@cspotcode/source-map-support": "0.8.1", "sharp": "0.35.2", "undici": "7.29.0", "workerd": "1.20260831.1", "ws": "8.21.0", "youch": "4.1.0-beta.10" } }, "sha512-Hwgh1VDUiPCPGQKODQfUmy7hRAje1D55icB+9png3ueiM64rlSM87nSrtqpxAD+DlLWI4ehnYBuECaXV43zGmQ=="],
 

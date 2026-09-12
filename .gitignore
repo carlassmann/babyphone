@@ -36,7 +36,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .certs/
 test-results/
 playwright-report/
-.reference/
+.reference
+.references
 
 public/pip-local-ca.crt
 

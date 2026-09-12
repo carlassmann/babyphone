@@ -9,10 +9,13 @@ import type { Session } from './protocol';
 import { readSession, readRooms, sessionsEqual, storeActive, storeRooms } from './sessions';
 import { InvitationModal, PrivacyModal, RoomsPopover } from './AppModals';
 import { DisclosureIcon, PrivacyIcon } from './icons';
+import { useIntl } from './intl/setup';
+import { LanguageSelect } from './LanguageSelect';
 
 type AppModal = '' | 'privacy';
 
 export function App() {
+  const t = useIntl();
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
@@ -68,7 +71,7 @@ export function App() {
     try {
       const state = await request('state', room);
       const own = state.devices.find((device: { id: string }) => device.id === room.deviceId);
-      if (!own) throw new Error('Your access to this room was removed.');
+      if (!own) throw new Error(t('app.accessRemoved'));
       if (room.deviceId !== session?.deviceId) await deactivateCurrent();
       saveSession({
         ...room,
@@ -77,7 +80,7 @@ export function App() {
         name: own.name,
       });
     } catch (error) {
-      setSwitchError(error instanceof Error ? error.message : 'Could not switch rooms.');
+      setSwitchError(error instanceof Error ? error.message : t('app.switchFailed'));
       throw error;
     } finally {
       setSwitching(false);
@@ -91,7 +94,7 @@ export function App() {
       await deactivateCurrent();
       await navigate({ to, hash });
     } catch (error) {
-      setSwitchError(error instanceof Error ? error.message : 'Connect before switching rooms.');
+      setSwitchError(error instanceof Error ? error.message : t('app.connectBeforeSwitch'));
       throw error;
     } finally {
       setSwitching(false);
@@ -108,7 +111,7 @@ export function App() {
       if (existing) await activate(existing);
       else await addRoom('/app/join', 'join=' + encodeURIComponent(incoming));
     } catch (error) {
-      setJoinError(error instanceof Error ? error.message : 'Could not switch rooms.');
+      setJoinError(error instanceof Error ? error.message : t('app.switchFailed'));
     } finally {
       setJoining(false);
     }
@@ -133,12 +136,12 @@ export function App() {
     const timer = setTimeout(
       () => {
         sessionStorage.setItem('pip-install-tip-seen', 'true');
-        toast('Install Pip', {
+        toast(t('common.install.title'), {
           id: 'pip-install',
-          description: 'Keep it one tap away on this device.',
+          description: t('common.install.description'),
           duration: 7000,
           action: pwa.canInstall
-            ? { label: 'Install', onClick: () => void pwa.install() }
+            ? { label: t('common.install.action'), onClick: () => void pwa.install() }
             : undefined,
         });
       },
@@ -190,7 +193,7 @@ export function App() {
       <div className={appMode ? 'app-shell application' : 'app-shell'}>
         {!(session && appMode) && (
           <header className="topbar">
-            <Link className="brand" to={appMode ? '/app' : '/'} aria-label="Pip homepage">
+            <Link className="brand" to={appMode ? '/app' : '/'} aria-label={t('app.homeLabel')}>
               <img src="/icon.svg" alt="" />
               pip
             </Link>
@@ -198,8 +201,13 @@ export function App() {
               <div className="shell-actions">
                 {rooms.length > 0 && roomSwitcher}
                 {appMode && rooms.length === 0 && (
-                  <button type="button" className="quiet small" onClick={() => setModal('privacy')}>
-                    Privacy
+                  <button
+                    type="button"
+                    className="quiet small"
+                    data-testid="privacy-topbar"
+                    onClick={() => setModal('privacy')}
+                  >
+                    {t('common.privacy')}
                   </button>
                 )}
               </div>
@@ -216,10 +224,13 @@ export function App() {
         />
         {!appMode && (
           <footer>
-            <button type="button" onClick={() => setModal('privacy')}>
-              Privacy
-            </button>
-            <nav aria-label="Project links">
+            <div className="footer-actions">
+              <button type="button" data-testid="privacy" onClick={() => setModal('privacy')}>
+                {t('common.privacy')}
+              </button>
+              <LanguageSelect showLabel={false} />
+            </div>
+            <nav aria-label={t('nav.projectLinks')}>
               <a href="https://github.com/carlassmann/babyphone" target="_blank" rel="noreferrer">
                 GitHub
               </a>
@@ -267,6 +278,7 @@ export function LandingScreen() {
   return <Welcome onJoin={saveSession} />;
 }
 export function AppScreen() {
+  const t = useIntl();
   const { session, saveSession, pwa, incoming, setModal, roomSwitcher, updateSession } = useApp();
   if (session)
     return (
@@ -278,11 +290,16 @@ export function AppScreen() {
         roomSwitcher={roomSwitcher}
         updateSession={updateSession}
         preferences={
-          <button type="button" className="settings-link" onClick={() => setModal('privacy')}>
+          <button
+            type="button"
+            className="settings-link"
+            data-testid="open-privacy"
+            onClick={() => setModal('privacy')}
+          >
             <span className="card-icon">
               <PrivacyIcon size={19} />
             </span>
-            <span>Privacy</span>
+            <span>{t('common.privacy')}</span>
             <DisclosureIcon size={18} />
           </button>
         }

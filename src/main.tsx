@@ -8,8 +8,11 @@ import './style.css';
 import { RouterProvider } from '@tanstack/react-router';
 import { IconDefaults } from './icons';
 import { router } from './router';
+import { LocaleProvider } from './intl/provider';
 createRoot(document.getElementById('root')!).render(
-  <IconDefaults>
-    <RouterProvider router={router} />
-  </IconDefaults>,
+  <LocaleProvider>
+    <IconDefaults>
+      <RouterProvider router={router} />
+    </IconDefaults>
+  </LocaleProvider>,
 );

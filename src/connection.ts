@@ -1,4 +1,6 @@
 import { HEARTBEAT_MS, OFFLINE_MS, type ServerMessage, type Session } from './protocol';
+import { readLocale } from './intl/locale';
+import { translate } from './intl/standalone';
 
 export type ConnectionStatus =
   | 'Connecting'
@@ -126,11 +128,11 @@ export async function request(path: string, body: object) {
   const response = await fetch(`/api/${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, locale: readLocale() }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   const result = await response.json();
   if (!response.ok)
-    throw new ApiError(result.error || 'Connection problem. Try again.', response.status);
+    throw new ApiError(result.error || translate()('common.error.connection'), response.status);
   return result;
 }

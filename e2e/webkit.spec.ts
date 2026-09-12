@@ -7,10 +7,11 @@ test('WebKit mobile setup, microphone start, saved role, and narrow layout', asy
     isMobile: true,
     hasTouch: true,
     permissions: ['microphone'],
+    locale: 'en-US',
   });
   const page = await context.newPage();
   await page.goto('http://localhost:4310/app');
-  await expect(page.getByRole('button', { name: 'Create a room' })).toBeVisible();
+  await expect(page.getByTestId('create-room')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(
     true,
@@ -18,24 +19,24 @@ test('WebKit mobile setup, microphone start, saved role, and narrow layout', asy
   expect(
     await page.locator('.app-onboarding').evaluate((el) => el.scrollHeight <= el.clientHeight),
   ).toBe(true);
-  await page.getByRole('button', { name: 'Create a room' }).click();
+  await page.getByTestId('create-room').click();
   await page.setViewportSize({ width: 375, height: 420 });
-  await page.getByLabel('Device name').fill('Small screen');
-  await page.getByRole('button', { name: 'Create room', exact: true }).scrollIntoViewIfNeeded();
+  await page.getByTestId('device-name').fill('Small screen');
+  await page.getByTestId('submit-room').scrollIntoViewIfNeeded();
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
   expect(await page.locator('.topbar').evaluate((el) => el.getBoundingClientRect().top)).toBe(0);
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.getByRole('button', { name: 'Baby Listen for little sounds' }).click();
-  await page.getByLabel('Device name').fill('WebKit nursery');
-  await page.getByRole('button', { name: 'Create room', exact: true }).click();
-  await expect(page.getByText('Connected', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Start monitoring' }).click();
-  await expect(page.getByRole('button', { name: 'Pause monitoring' })).toBeVisible();
-  await page.getByRole('button', { name: 'Pause monitoring' }).click();
+  await page.getByTestId('role-baby').click();
+  await page.getByTestId('device-name').fill('WebKit nursery');
+  await page.getByTestId('submit-room').click();
+  await expect(page.getByTestId('connection-status')).toHaveAttribute('data-status', 'connected');
+  await page.getByTestId('monitor-toggle').click();
+  await expect(page.getByTestId('monitor-toggle')).toHaveAttribute('data-active', 'true');
+  await page.getByTestId('monitor-toggle').click();
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Start monitoring' })).toBeVisible();
-  await page.getByRole('link', { name: 'Settings', exact: true }).click();
-  const lastSetting = page.getByRole('button', { name: 'Privacy' });
+  await expect(page.getByTestId('monitor-toggle')).toHaveAttribute('data-active', 'false');
+  await page.getByTestId('nav-settings').click();
+  const lastSetting = page.getByTestId('open-privacy');
   await lastSetting.scrollIntoViewIfNeeded();
   const settingBottom = await lastSetting.evaluate(
     (element) => element.getBoundingClientRect().bottom,

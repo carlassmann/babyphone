@@ -2,19 +2,25 @@ import { createRootRoute, createRoute, createRouter, Link, redirect } from '@tan
 import { ActivityScreen, MonitorScreen, SettingsScreen } from './features/room';
 import { App, AppScreen, LandingScreen } from './App';
 import { readSession } from './sessions';
+import { useIntl } from './intl/setup';
 
-const root = createRootRoute({
-  component: App,
-  notFoundComponent: () => (
+function NotFoundScreen() {
+  const t = useIntl();
+  return (
     <main className="app-onboarding">
       <section>
-        <h1>Page not found</h1>
+        <h1>{t('notFound.title')}</h1>
         <Link to="/app" className="secondary">
-          Open your monitor
+          {t('notFound.action')}
         </Link>
       </section>
     </main>
-  ),
+  );
+}
+
+const root = createRootRoute({
+  component: App,
+  notFoundComponent: NotFoundScreen,
 });
 const landing = createRoute({
   getParentRoute: () => root,

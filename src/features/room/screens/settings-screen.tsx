@@ -5,6 +5,7 @@ import {
   DeviceIcon,
   DisclosureIcon,
   ForwardIcon,
+  LanguageIcon,
   ParentIcon,
   RoomIcon,
   type IconComponent,
@@ -15,16 +16,20 @@ import type { PublicDevice } from '../../../protocol';
 import { RenameField } from '../parts/room-components';
 import { RemoveDeviceConfirmation } from '../parts/room-modals';
 import { useRoom } from '../room-context';
+import { useIntl } from '../../../intl/setup';
+import { LanguageSelect } from '../../../LanguageSelect';
 
 export function SettingsScreen() {
+  const t = useIntl();
   const room = useRoom();
 
   return (
     <>
       {!room.isBaby && (
-        <SettingsCard icon={RoomIcon} title="Room">
+        <SettingsCard icon={RoomIcon} title={t('settings.room')}>
           <RenameField
-            label="Room name"
+            label={t('settings.roomName')}
+            testId="rename-room"
             value={room.session.roomName}
             onSave={(name) => request('rename-room', { ...room.session, name })}
           />
@@ -32,20 +37,29 @@ export function SettingsScreen() {
       )}
       <RoomDevices room={room} />
       {room.isBaby ? (
-        <SettingsCard icon={BabyIcon} title="Device setup">
+        <SettingsCard icon={BabyIcon} title={t('settings.deviceSetup')}>
           <BabySetup />
         </SettingsCard>
       ) : (
-        <SettingsCard icon={AlertIcon} title="Notifications">
+        <SettingsCard icon={AlertIcon} title={t('settings.notifications')}>
           <NotificationSetup room={room} />
         </SettingsCard>
       )}
+      <SettingsCard icon={LanguageIcon} title={t('language.title')}>
+        <p>{t('language.description')}</p>
+        <LanguageSelect />
+      </SettingsCard>
       <section className="side-card settings-links">
-        <button type="button" className="settings-link" onClick={room.openSettings}>
+        <button
+          type="button"
+          className="settings-link"
+          data-testid="manage-device"
+          onClick={room.openSettings}
+        >
           <span className="card-icon">
             <DeviceIcon size={19} />
           </span>
-          <span>Manage this device</span>
+          <span>{t('settings.manageDevice')}</span>
           <DisclosureIcon size={18} />
         </button>
         {room.preferences}
@@ -55,13 +69,14 @@ export function SettingsScreen() {
 }
 
 function RoomDevices({ room }: { room: ReturnType<typeof useRoom> }) {
+  const t = useIntl();
   const [pendingRemoval, setPendingRemoval] = useState<PublicDevice | null>(null);
   const otherDevices = room.devices.filter((device) => device.id !== room.session.deviceId);
 
   if (otherDevices.length === 0 && !room.accessNotice) return null;
 
   return (
-    <SettingsCard icon={ParentIcon} title="Devices in this room">
+    <SettingsCard icon={ParentIcon} title={t('settings.devicesTitle')}>
       <ul className="device-rows">
         {otherDevices.map((device) => (
           <DeviceRow
@@ -77,10 +92,7 @@ function RoomDevices({ room }: { room: ReturnType<typeof useRoom> }) {
           {room.accessNotice}
         </p>
       ) : (
-        <p className="caption">
-          Removing a device also resets the invitation link. Devices that stay keep their
-          connection.
-        </p>
+        <p className="caption">{t('settings.devicesHint')}</p>
       )}
       {pendingRemoval && (
         <RemoveDeviceConfirmation
@@ -106,13 +118,15 @@ function DeviceRow({
   room: ReturnType<typeof useRoom>;
   onRemove: () => void;
 }) {
+  const t = useIntl();
   const [renaming, setRenaming] = useState(false);
 
   if (renaming) {
     return (
       <li className="renaming">
         <RenameField
-          label={`Name for ${device.name}`}
+          label={t('settings.deviceNameFor', { name: device.name })}
+          testId="rename-device"
           value={device.name}
           onSave={async (name) => {
             await request('rename-device', { ...room.session, name, target: device.id });
@@ -120,40 +134,43 @@ function DeviceRow({
           }}
         />
         <button type="button" className="quiet small" onClick={() => setRenaming(false)}>
-          Cancel
+          {t('common.cancel')}
         </button>
       </li>
     );
   }
 
   return (
-    <li>
+    <li data-testid="device-row" data-device-id={device.id} data-device-name={device.name}>
       <span className="card-icon">
         {device.role === 'baby' ? <BabyIcon size={19} /> : <ParentIcon size={19} />}
       </span>
       <div>
         <strong>{device.name}</strong>
         <span>
-          {device.role === 'baby' ? 'Baby' : 'Parent'} · {device.online ? 'Online' : 'Offline'}
+          {device.role === 'baby' ? t('role.baby') : t('role.parent')} ·{' '}
+          {device.online ? t('settings.deviceOnline') : t('settings.deviceOffline')}
         </span>
       </div>
       <button
         type="button"
         className="quiet small"
+        data-testid="device-rename"
         disabled={!room.connected}
         onClick={() => setRenaming(true)}
-        aria-label={`Rename ${device.name}`}
+        aria-label={t('settings.renameLabel', { name: device.name })}
       >
-        Rename
+        {t('settings.rename')}
       </button>
       <button
         type="button"
         className="quiet small danger"
+        data-testid="device-remove"
         disabled={room.busy || !room.connected}
         onClick={onRemove}
-        aria-label={`Remove ${device.name}`}
+        aria-label={t('settings.removeLabel', { name: device.name })}
       >
-        Remove
+        {t('settings.remove')}
       </button>
     </li>
   );
@@ -182,18 +199,19 @@ function SettingsCard({
 }
 
 function BabySetup() {
+  const t = useIntl();
   return (
     <>
-      <p>Keep this device plugged in, with Pip open in the foreground.</p>
+      <p>{t('settings.babyKeepPlugged')}</p>
       <ul className="check-list">
         <li>
-          <CheckIcon size={17} weight="bold" /> Volume is analyzed here
+          <CheckIcon size={17} weight="bold" /> {t('settings.babyCheckAnalyzed')}
         </li>
         <li>
-          <CheckIcon size={17} weight="bold" /> No audio is saved
+          <CheckIcon size={17} weight="bold" /> {t('settings.babyCheckNoSave')}
         </li>
         <li>
-          <CheckIcon size={17} weight="bold" /> Parents can listen anytime
+          <CheckIcon size={17} weight="bold" /> {t('settings.babyCheckListen')}
         </li>
       </ul>
     </>
@@ -201,29 +219,29 @@ function BabySetup() {
 }
 
 function NotificationSetup({ room }: { room: ReturnType<typeof useRoom> }) {
+  const t = useIntl();
   return (
     <>
-      <p>
-        Get a notification for noise or a disconnected baby device, even when Pip is in
-        the background.
-      </p>
+      <p>{t('settings.notificationsBody')}</p>
       <button
         type="button"
         className={room.pushEnabled ? 'secondary full small' : 'primary full small'}
+        data-testid="enable-notifications"
         disabled={room.busy || room.pushEnabled || !room.connected}
         onClick={() => void room.enableNotifications()}
       >
         {room.pushEnabled ? <CheckIcon size={17} weight="bold" /> : <AlertIcon size={17} />}{' '}
-        {room.pushEnabled ? 'Notifications enabled' : 'Enable notifications'}
+        {room.pushEnabled ? t('settings.notificationsEnabled') : t('settings.notificationsEnable')}
       </button>
       {room.pushEnabled && (
         <button
           type="button"
           className="quiet full small"
+          data-testid="test-notification"
           disabled={room.busy}
           onClick={() => void room.testNotification()}
         >
-          Test notification <ForwardIcon size={16} />
+          {t('settings.notificationsTest')} <ForwardIcon size={16} />
         </button>
       )}
       {room.pushTestMessage && (
@@ -231,10 +249,7 @@ function NotificationSetup({ room }: { room: ReturnType<typeof useRoom> }) {
           {room.pushTestMessage}
         </p>
       )}
-      <p className="caption">
-        Allow notifications in your device settings too. Delivery can be delayed by your device or
-        network.
-      </p>
+      <p className="caption">{t('settings.notificationsHint')}</p>
     </>
   );
 }

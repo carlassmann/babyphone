@@ -6,6 +6,9 @@ const EARLY_CANDIDATE_TTL_MS = 30_000;
 const MAX_EARLY_CANDIDATES_PER_CALL = 32;
 const MAX_PENDING_CALLS = 50;
 
+export type AudioStatus =
+  'connecting' | 'live' | 'paused' | 'stopped' | 'disconnected' | 'failed' | '';
+
 type Call = {
   peer: RTCPeerConnection;
   audio?: HTMLAudioElement;
@@ -32,7 +35,7 @@ export class AudioCalls {
     private send: (target: string, payload: Signal) => void,
     private getStream: () => MediaStream | undefined,
     private audioContainer: HTMLDivElement,
-    private onStatus: (status: string, target?: string) => void,
+    private onStatus: (status: AudioStatus, target?: string) => void,
     private session: Session,
   ) {}
 
@@ -40,7 +43,7 @@ export class AudioCalls {
     this.stop(target);
     const generation = this.generation;
     const attempt = this.attempts.get(target);
-    this.onStatus('Connecting audio', target);
+    this.onStatus('connecting', target);
 
     await this.configure();
     if (generation !== this.generation || attempt !== this.attempts.get(target)) return;
@@ -66,7 +69,7 @@ export class AudioCalls {
     if (signal.kind === 'stop') {
       if (call?.target === source) {
         this.endCall(signal.callId, false);
-        this.onStatus('Audio stopped', source);
+        this.onStatus('stopped', source);
       }
       return;
     }
@@ -93,7 +96,7 @@ export class AudioCalls {
     );
     if (!call?.audio) return;
     await call.audio.play();
-    if (this.calls.get(call.callId) === call) this.onStatus('Listening live', target);
+    if (this.calls.get(call.callId) === call) this.onStatus('live', target);
   }
 
   stop(target?: string) {
@@ -124,7 +127,7 @@ export class AudioCalls {
       pendingCandidates: [],
       timeout: setTimeout(() => {
         this.endCall(callId);
-        this.onStatus('Could not connect. Try again; different networks may need TURN.', target);
+        this.onStatus('failed', target);
       }, CALL_TIMEOUT_MS),
     };
 
@@ -147,13 +150,13 @@ export class AudioCalls {
     if (!call.audio) return;
     call.audio.onpause = () => {
       if (this.calls.has(call.callId)) {
-        this.onStatus('Tap Resume audio to hear your baby.', call.target);
+        this.onStatus('paused', call.target);
       }
     };
     call.audio.onended = () => {
       if (!this.calls.has(call.callId)) return;
       this.endCall(call.callId);
-      this.onStatus('Audio disconnected. Tap Listen to reconnect.', call.target);
+      this.onStatus('disconnected', call.target);
     };
   }
 
@@ -166,15 +169,12 @@ export class AudioCalls {
       if (peer.connectionState === 'connected') {
         clearTimeout(call.timeout);
         if (listening) {
-          this.onStatus(
-            call.audio?.paused ? 'Tap Resume audio to hear your baby.' : 'Listening live',
-            target,
-          );
+          this.onStatus(call.audio?.paused ? 'paused' : 'live', target);
         }
       }
       if (['failed', 'disconnected'].includes(peer.connectionState)) {
         this.endCall(callId);
-        if (listening) this.onStatus('Audio disconnected. Tap Listen to reconnect.', target);
+        if (listening) this.onStatus('disconnected', target);
       }
     };
     peer.ontrack = ({ streams, track }) => {
@@ -183,10 +183,10 @@ export class AudioCalls {
       void call.audio
         .play()
         .then(() => {
-          if (this.calls.has(callId)) this.onStatus('Listening live', target);
+          if (this.calls.has(callId)) this.onStatus('live', target);
         })
         .catch(() => {
-          if (this.calls.has(callId)) this.onStatus('Tap Resume audio to hear your baby.', target);
+          if (this.calls.has(callId)) this.onStatus('paused', target);
         });
     };
   }

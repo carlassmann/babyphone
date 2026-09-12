@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Sun,
   SunDim,
+  Translate,
   Waveform,
   WifiHigh,
   X,
@@ -58,4 +59,5 @@ export const BrightIcon = Sun;
 export const DimIcon = SunDim;
 export const SoundIcon = Waveform;
 export const ConnectionIcon = WifiHigh;
+export const LanguageIcon = Translate;
 export const CloseIcon = X;

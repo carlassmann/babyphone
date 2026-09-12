@@ -3,6 +3,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { CheckIcon, ExpandIcon } from './icons';
 import type { Session } from './protocol';
 import { Modal } from './Modal';
+import { useIntl } from './intl/setup';
 
 export function InvitationModal({
   currentRoom,
@@ -17,17 +18,32 @@ export function InvitationModal({
   onConfirm: () => void;
   onDismiss: () => void;
 }) {
+  const t = useIntl();
   return (
-    <Modal title="Open this invitation?" close={() => !joining && onDismiss()}>
-      <p>
-        Switch from {currentRoom}? Monitoring and notifications follow the active room. You can
-        return to your saved rooms anytime.
-      </p>
-      <button type="button" className="primary full" disabled={joining} onClick={onConfirm}>
-        {joining ? 'Switching room…' : 'Switch room and join'}
+    <Modal
+      title={t('invite.openTitle')}
+      testId="invitation-modal"
+      close={() => !joining && onDismiss()}
+    >
+      <p>{t('invite.switchBody', { room: currentRoom })}</p>
+      <button
+        type="button"
+        className="primary full"
+        data-testid="invitation-confirm"
+        data-busy={joining}
+        disabled={joining}
+        onClick={onConfirm}
+      >
+        {joining ? t('invite.switching') : t('invite.switchAndJoin')}
       </button>
-      <button type="button" className="secondary full" disabled={joining} onClick={onDismiss}>
-        Keep current room
+      <button
+        type="button"
+        className="secondary full"
+        data-testid="invitation-keep"
+        disabled={joining}
+        onClick={onDismiss}
+      >
+        {t('invite.keep')}
       </button>
       {error && (
         <p role="alert" className="notice">
@@ -59,6 +75,7 @@ export function RoomsPopover({
   onForget: (room: Session) => void;
   onOpen: () => void;
 }) {
+  const t = useIntl();
   const [open, setOpen] = useState(false);
   const titleId = useId();
 
@@ -86,9 +103,14 @@ export function RoomsPopover({
       }}
     >
       <Popover.Trigger asChild>
-        <button type="button" className="room-switcher" aria-label="Switch room">
+        <button
+          type="button"
+          className="room-switcher"
+          data-testid="room-switcher"
+          aria-label={t('rooms.switchLabel')}
+        >
           <span>
-            {rooms.find((room) => room.deviceId === activeDeviceId)?.roomName || 'Saved rooms'}
+            {rooms.find((room) => room.deviceId === activeDeviceId)?.roomName || t('rooms.saved')}
           </span>
           <ExpandIcon size={18} />
         </button>
@@ -101,21 +123,27 @@ export function RoomsPopover({
           collisionPadding={16}
           aria-labelledby={titleId}
         >
-          <h2 id={titleId}>Your rooms</h2>
-          <p>Switching rooms stops live audio.</p>
+          <h2 id={titleId}>{t('rooms.title')}</h2>
+          <p>{t('rooms.subtitle')}</p>
           <div className="saved-rooms">
             {rooms.map((room) => (
               <div className="saved-room" key={room.roomId}>
                 <button
                   type="button"
                   className="secondary full"
+                  data-testid="room-option"
+                  data-room-id={room.roomId}
+                  data-room-name={room.roomName}
+                  data-device-id={room.deviceId}
+                  data-device-name={room.name}
+                  data-active={room.deviceId === activeDeviceId}
                   disabled={switching}
                   onClick={() => void activate(room)}
                 >
                   <span>
                     {room.roomName}
                     <small>
-                      {room.name} · {room.role === 'baby' ? 'Baby' : 'Parent'}
+                      {room.name} · {room.role === 'baby' ? t('role.baby') : t('role.parent')}
                     </small>
                   </span>
                   {room.deviceId === activeDeviceId && <CheckIcon size={18} weight="bold" />}
@@ -124,11 +152,13 @@ export function RoomsPopover({
                   <button
                     type="button"
                     className="quiet small"
+                    data-testid="forget-room"
+                    data-room-name={room.roomName}
                     disabled={switching}
-                    aria-label={`Forget ${room.roomName}`}
+                    aria-label={t('rooms.forgetLabel', { room: room.roomName })}
                     onClick={() => onForget(room)}
                   >
-                    Forget
+                    {t('rooms.forget')}
                   </button>
                 )}
               </div>
@@ -138,22 +168,24 @@ export function RoomsPopover({
             <button
               type="button"
               className="primary"
+              data-testid="create-room-popover"
               disabled={switching}
               onClick={() => void add('/app/create')}
             >
-              Create a room
+              {t('welcome.createRoom')}
             </button>
             <button
               type="button"
               className="secondary"
+              data-testid="join-room-popover"
               disabled={switching}
               onClick={() => void add('/app/join')}
             >
-              Join a room
+              {t('welcome.joinRoom')}
             </button>
           </div>
           {error && (
-            <p role="alert" className="notice">
+            <p role="alert" className="notice" data-testid="rooms-error">
               {error}
             </p>
           )}
@@ -164,24 +196,28 @@ export function RoomsPopover({
 }
 
 export function PrivacyModal({ onClose }: { onClose: () => void }) {
+  const t = useIntl();
   return (
-    <Modal title="Privacy" close={onClose}>
+    <Modal title={t('privacy.title')} testId="privacy-modal" close={onClose}>
       <PrivacyContent />
     </Modal>
   );
 }
 
 function PrivacyContent() {
+  const t = useIntl();
   return (
     <>
-      <p>
-        Sound is analyzed on the baby device. Pip never records it. Live listening uses an encrypted
-        audio connection between your devices, with a relay only when needed.
-      </p>
-      <p>Your invitation code is the key to your room. Share it only with people you trust.</p>
+      <p>{t('privacy.paragraph1')}</p>
+      <p>{t('privacy.paragraph2')}</p>
       <div className="project-links">
-        <a href="https://github.com/carlassmann/babyphone" target="_blank" rel="noreferrer">
-          Source code
+        <a
+          href="https://github.com/carlassmann/babyphone"
+          target="_blank"
+          rel="noreferrer"
+          data-testid="source-code"
+        >
+          {t('privacy.source')}
         </a>
         <a href="https://carlassmann.com" target="_blank" rel="noreferrer">
           carlassmann.com

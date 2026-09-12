@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
+import { useIntl } from './intl/setup';
 
 export function InvitationQr({ code }: { code: string }) {
+  const t = useIntl();
   const [image, setImage] = useState('');
   const [error, setError] = useState('');
 
@@ -12,17 +14,17 @@ export function InvitationQr({ code }: { code: string }) {
         if (!cancelled) setImage(url);
       })
       .catch(() => {
-        if (!cancelled) setError('QR code unavailable. Copy the invitation code below.');
+        if (!cancelled) setError(t('qr.unavailable'));
       });
     return () => {
       cancelled = true;
     };
-  }, [code]);
+  }, [code, t]);
 
   return (
     <div className="invitation-qr">
-      {image && <img src={image} width="224" height="224" alt="Invitation code QR" />}
-      <p>Scan to copy the code, then paste it into Pip’s Join a room screen.</p>
+      {image && <img src={image} width="224" height="224" alt={t('qr.alt')} />}
+      <p>{t('qr.hint')}</p>
       {error && <p role="status">{error}</p>}
     </div>
   );

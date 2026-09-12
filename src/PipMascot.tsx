@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import './PipMascot.css';
+import { useIntl } from './intl/setup';
 
 export type PipMascotState = 'paused' | 'quiet' | 'sound';
 
@@ -12,6 +13,7 @@ export function PipMascot({
   className?: string;
   state: PipMascotState;
 }) {
+  const t = useIntl();
   const id = useId();
   const [interacting, setInteracting] = useState(false);
   const [listening, setListening] = useState(state === 'sound');
@@ -39,9 +41,10 @@ export function PipMascot({
     <button
       type="button"
       className={`monitor-mascot ${className} ${state}`}
+      data-testid="pip-mascot"
       data-state={state}
       data-pose={awake ? 'awake' : 'sleeping'}
-      aria-label="Make Pip stir"
+      aria-label={t('mascot.stir')}
       onClick={wake}
       onPointerEnter={(event) => {
         if (
@@ -56,7 +59,7 @@ export function PipMascot({
         className="pip-character"
         viewBox="0 0 360 280"
         role="img"
-        aria-label={awake ? 'Pip awake and looking around' : alt}
+        aria-label={awake ? t('mascot.awake') : alt}
       >
         <defs>
           <radialGradient id={`${id}-down`} cx="35%" cy="25%" r="80%">

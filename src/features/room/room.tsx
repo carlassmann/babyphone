@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Outlet } from '@tanstack/react-router';
 import { RoomConnection, request, type ConnectionStatus } from '../../connection';
-import { AudioCalls } from './lib/audio-calls';
+import { AudioCalls, type AudioStatus } from './lib/audio-calls';
 import { BabyAudio } from './lib/baby-audio';
 import { enableNotifications, usePwa } from '../../pwa';
 import { useScreenWake } from '../../useScreenWake';
@@ -18,12 +18,9 @@ import { DeviceSettingsModal, InvitationModal } from './parts/room-modals';
 import { RoomProvider } from './room-context';
 import { SENSITIVITY_THRESHOLDS } from '../../noise';
 import { recentEvent } from './lib/recent-event';
+import { useIntl } from '../../intl/setup';
 
-const AUDIO_ACTIVE_STATUSES = [
-  'Listening live',
-  'Connecting audio',
-  'Tap Resume audio to hear your baby.',
-];
+const AUDIO_ACTIVE_STATUSES: AudioStatus[] = ['connecting', 'live', 'paused'];
 const RECENT_EVENT_MS = 60_000;
 export function Room({
   session,
@@ -40,6 +37,7 @@ export function Room({
   roomSwitcher: ReactNode;
   updateSession: (session: Session) => void;
 }) {
+  const t = useIntl();
   const [devices, setDevices] = useState<PublicDevice[]>([]);
   const [events, setEvents] = useState<Alert[]>([]);
   const [connection, setConnection] = useState<ConnectionStatus>('Connecting');
@@ -50,7 +48,7 @@ export function Room({
   const [busy, setBusy] = useState(false);
   const [modal, setModal] = useState('');
   const [copied, setCopied] = useState('');
-  const [audioStatuses, setAudioStatuses] = useState<Record<string, string>>({});
+  const [audioStatuses, setAudioStatuses] = useState<Record<string, AudioStatus>>({});
   const listeningTo = Object.values(audioStatuses).some((status) =>
     AUDIO_ACTIVE_STATUSES.includes(status),
   );
@@ -81,11 +79,7 @@ export function Room({
         target,
       });
       setCopied('');
-      setAccessNotice(
-        target
-          ? 'Device removed. Previous invitation links no longer work.'
-          : 'Invitation reset. Previous links no longer work.',
-      );
+      setAccessNotice(target ? t('room.deviceRemoved') : t('room.invitationReset'));
     } catch (error) {
       setError(errorMessage(error));
     } finally {
@@ -255,7 +249,7 @@ export function Room({
       babyRef.current?.stop();
       setError(
         error instanceof DOMException && error.name === 'NotAllowedError'
-          ? 'Microphone access is blocked. Allow it in browser settings, then try again.'
+          ? t('room.micBlocked')
           : errorMessage(error),
       );
     } finally {
@@ -280,7 +274,7 @@ export function Room({
     setPushTest('');
     try {
       await request('test-push', session);
-      setPushTest('Accepted by the push service. Check this device for the test notification.');
+      setPushTest(t('settings.notificationsAccepted'));
     } catch (error) {
       setPush(false);
       setError(errorMessage(error));
@@ -315,7 +309,7 @@ export function Room({
       await navigator.clipboard.writeText(value);
       setCopied(label);
     } catch {
-      setError('Copy is unavailable. Select and copy the invitation code below.');
+      setError(t('common.copyUnavailable'));
     }
   }
 
@@ -357,14 +351,14 @@ export function Room({
             parentAwake={!isBaby && parentAwake}
           />
           <div className="room-alerts">
-            {!isBaby && !parentAwake && (
-              <p className="notice">
-                Screen wake lock unavailable. Keep this screen awake manually while listening.
+            {!isBaby && connected && !parentAwake && (
+              <p className="notice" data-testid="wake-lock-notice">
+                {t('room.screenWakeUnavailable')}
               </p>
             )}
             {!connected && <ConnectionNotice connection={connection} />}
             {error && <ErrorNotice error={error} onDismiss={() => setError('')} />}
-            {!isBaby && latestEvent && (
+            {!isBaby && connected && latestEvent && (
               <EventNotice
                 event={latestEvent}
                 onDismiss={() => setDismissedEventsThrough(latestEvent.at)}

@@ -1,4 +1,5 @@
 import { LevelHold, NoiseDetector, rms } from '../../../noise';
+import { translate } from '../../../intl/standalone';
 
 const SAMPLE_INTERVAL_MS = 100;
 const WAKE_RETRY_MS = 1_000;
@@ -29,7 +30,7 @@ export class BabyAudio {
   async start() {
     const generation = ++this.generation;
     if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error('Microphone needs HTTPS or localhost. Open Pip using a secure address.');
+      throw new Error(translate()('mic.https'));
     }
 
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -88,13 +89,12 @@ export class BabyAudio {
 
   private watchForInterruptions(stream: MediaStream) {
     stream.getAudioTracks().forEach((track) => {
-      track.onended = () => this.fail('Microphone stopped. Restart monitoring.');
-      track.onmute = () =>
-        this.fail('Microphone interrupted. Keep Pip open, then restart monitoring.');
+      track.onended = () => this.fail(translate()('mic.stopped'));
+      track.onmute = () => this.fail(translate()('mic.interrupted'));
     });
     this.audioContext!.onstatechange = () => {
       if (this.active && this.audioContext?.state !== 'running') {
-        this.fail('Audio was suspended. Keep Pip open and restart monitoring.');
+        this.fail(translate()('mic.suspended'));
       }
     };
     document.addEventListener('visibilitychange', this.handleVisibilityChange);

@@ -14,6 +14,7 @@ import { InvitationScanner } from './InvitationScanner';
 import { PipMascot } from './PipMascot';
 import { request } from './connection';
 import { errorMessage } from './format';
+import { T, useIntl } from './intl/setup';
 import type { Role, Session } from './protocol';
 export function Welcome({
   onJoin,
@@ -22,6 +23,7 @@ export function Welcome({
   onJoin: (value: Session) => void;
   appMode?: boolean;
 }) {
+  const t = useIntl();
   const route = useLocation();
   const navigate = useNavigate();
   const invited = new URLSearchParams(route.hash.replace(/^#/, '')).get('join') || '';
@@ -40,7 +42,7 @@ export function Welcome({
   const [role, setRole] = useState<Role>('parent');
   const [name, setName] = useState('');
   const [roomKey, setRoomKey] = useState(invited);
-  const [roomName, setRoomName] = useState('Our little nest');
+  const [roomName, setRoomName] = useState(() => t('welcome.defaultRoomName'));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   async function submit(event: FormEvent) {
@@ -49,7 +51,9 @@ export function Welcome({
     setError('');
     try {
       const session = await request('register', {
-        name: name.trim() || (role === 'baby' ? 'Nursery' : 'My phone'),
+        name:
+          name.trim() ||
+          (role === 'baby' ? t('welcome.defaultBabyName') : t('welcome.defaultParentName')),
         role,
         ...(mode === 'join' ? { roomKey } : { roomName }),
       });
@@ -65,21 +69,24 @@ export function Welcome({
       {!appMode && (
         <section className="welcome-art">
           <h1>
-            Close by.
-            <br />
-            Even from
-            <br />
-            <em>the next room.</em>
+            <T
+              k="welcome.hero"
+              components={{
+                br: () => <br />,
+                em: ({ children }) => <em>{children}</em>,
+              }}
+            />
           </h1>
           <div className="mascot-wrap">
             <figure className="landing-mascot-state">
-              <PipMascot
-                className="landing-mascot"
-                state="quiet"
-                alt="Pip breathing gently while the room is quiet"
-              />
+              <PipMascot className="landing-mascot" state="quiet" alt={t('welcome.mascotAlt')} />
               <figcaption>
-                Psst… tap<span className="pip-hover-hint"> or hover</span> to wake Pip.
+                <T
+                  k="welcome.mascotHint"
+                  components={{
+                    hint: ({ children }) => <span className="pip-hover-hint">{children}</span>,
+                  }}
+                />
               </figcaption>
             </figure>
           </div>
@@ -90,32 +97,28 @@ export function Welcome({
           <>
             <h2>
               {appMode ? (
-                'Set up your monitor'
+                t('welcome.setupTitle')
               ) : (
-                <>
-                  Their room. <br />
-                  Your peace of mind.
-                </>
+                <T k="welcome.title" components={{ br: () => <br /> }} />
               )}
             </h2>
-            <p>
-              Turn two devices into a cozy little baby monitor. One stays with your baby. One stays
-              with you.
-            </p>
+            <p>{t('welcome.intro')}</p>
             <div className="welcome-actions">
               <button
                 type="button"
                 className="primary"
+                data-testid="create-room"
                 onClick={() => void navigate({ to: '/app/create' })}
               >
-                Create a room <ForwardIcon size={18} />
+                {t('welcome.createRoom')} <ForwardIcon size={18} />
               </button>
               <button
                 type="button"
                 className="secondary"
+                data-testid="join-room"
                 onClick={() => void navigate({ to: '/app/join' })}
               >
-                Join a room <InviteLinkIcon size={18} />
+                {t('welcome.joinRoom')} <InviteLinkIcon size={18} />
               </button>
             </div>
             {!appMode && (
@@ -124,19 +127,19 @@ export function Welcome({
                   <span className="step-icon">
                     <DeviceIcon size={18} />
                   </span>
-                  Two or more devices
+                  {t('welcome.stepDevices')}
                 </span>
                 <span>
                   <span className="step-icon">
                     <MicrophoneIcon size={18} />
                   </span>
-                  Live audio
+                  {t('welcome.stepAudio')}
                 </span>
                 <span>
                   <span className="step-icon">
                     <AlertIcon size={18} />
                   </span>
-                  Gentle alerts
+                  {t('welcome.stepAlerts')}
                 </span>
               </div>
             )}
@@ -146,33 +149,36 @@ export function Welcome({
             <button
               type="button"
               className="back quiet"
+              data-testid="back"
               onClick={() => void navigate({ to: '/app', hash: '', search: {} })}
             >
-              <BackIcon size={16} /> Back
+              <BackIcon size={16} /> {t('welcome.back')}
             </button>
-            <h2>{mode === 'join' ? 'Join a room' : 'Create a room'}</h2>
-            <p>
-              {mode === 'join'
-                ? 'Use the invitation from your other device.'
-                : 'Start here, then invite your other device.'}
-            </p>
+            <h2>{mode === 'join' ? t('welcome.joinRoom') : t('welcome.createRoom')}</h2>
+            <p>{mode === 'join' ? t('welcome.joinIntro') : t('welcome.createIntro')}</p>
             {mode === 'join' ? (
               <>
                 <label>
-                  Invitation code
+                  {t('welcome.invitationCode')}
                   <input
                     required
+                    data-testid="invitation-code"
                     className="invitation-code"
                     value={roomKey}
                     onChange={(e) => setRoomKey(e.target.value)}
-                    placeholder="Paste your room code"
+                    placeholder={t('welcome.invitationPlaceholder')}
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
                   />
                 </label>
-                <button type="button" className="secondary full" onClick={() => setScanning(true)}>
-                  Scan QR code
+                <button
+                  type="button"
+                  className="secondary full"
+                  data-testid="scan-qr"
+                  onClick={() => setScanning(true)}
+                >
+                  {t('welcome.scanQr')}
                 </button>
                 {scanning && (
                   <InvitationScanner onScan={scanned} close={() => setScanning(false)} />
@@ -180,58 +186,69 @@ export function Welcome({
               </>
             ) : (
               <label>
-                Room name
+                {t('welcome.roomName')}
                 <input
                   required
                   maxLength={40}
+                  data-testid="room-name"
                   value={roomName}
                   onChange={(e) => setRoomName(e.target.value)}
                 />
               </label>
             )}
             <fieldset>
-              <legend>This device stays with…</legend>
+              <legend>{t('welcome.roleLegend')}</legend>
               <div className="role-picker">
                 <button
                   type="button"
+                  data-testid="role-baby"
                   aria-pressed={role === 'baby'}
                   onClick={() => setRole('baby')}
                 >
                   <BabyIcon size={24} />
-                  <strong>Baby</strong>
-                  <span>Listen for little sounds</span>
+                  <strong>{t('welcome.roleBaby')}</strong>
+                  <span>{t('welcome.roleBabyDetail')}</span>
                 </button>
                 <button
                   type="button"
+                  data-testid="role-parent"
                   aria-pressed={role === 'parent'}
                   onClick={() => setRole('parent')}
                 >
                   <ParentIcon size={24} />
-                  <strong>Me</strong>
-                  <span>Keep an ear out</span>
+                  <strong>{t('welcome.roleParent')}</strong>
+                  <span>{t('welcome.roleParentDetail')}</span>
                 </button>
               </div>
             </fieldset>
             <label>
-              Device name
+              {t('welcome.deviceName')}
               <input
                 maxLength={40}
+                data-testid="device-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={role === 'baby' ? 'Nursery' : 'My phone'}
+                placeholder={
+                  role === 'baby' ? t('welcome.deviceNameBaby') : t('welcome.deviceNameParent')
+                }
               />
             </label>
             {error && (
-              <p role="alert" className="notice">
+              <p role="alert" className="notice" data-testid="form-error">
                 {error}
               </p>
             )}
             <button
               type="submit"
               className="primary full"
+              data-testid="submit-room"
               disabled={busy || (mode === 'join' && !roomKey.trim())}
             >
-              {busy ? 'Getting your room ready…' : mode === 'join' ? 'Join room' : 'Create room'}
+              {busy
+                ? t('welcome.submitting')
+                : mode === 'join'
+                  ? t('welcome.submitJoin')
+                  : t('welcome.submitCreate')}
               <ForwardIcon size={18} />
             </button>
           </form>

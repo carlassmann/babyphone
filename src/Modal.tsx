@@ -1,14 +1,18 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { CloseIcon } from './icons';
+import { useIntl } from './intl/setup';
 export function Modal({
   title,
   close,
   children,
+  testId = 'dialog',
 }: {
   title: string;
   close: () => void;
   children: ReactNode;
+  testId?: string;
 }) {
+  const t = useIntl();
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current!;
@@ -18,6 +22,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
+      data-testid={testId}
       aria-label={title}
       onCancel={(event) => {
         event.preventDefault();
@@ -31,8 +36,9 @@ export function Modal({
         <button
           type="button"
           className="icon-button modal-close"
+          data-testid="close-dialog"
           onClick={close}
-          aria-label="Close dialog"
+          aria-label={t('common.closeDialog')}
         >
           <CloseIcon size={19} />
         </button>
