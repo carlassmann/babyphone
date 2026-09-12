@@ -4,13 +4,10 @@ import {
   CheckIcon,
   DeviceIcon,
   DisclosureIcon,
-  ForwardIcon,
-  LanguageIcon,
   ParentIcon,
-  RoomIcon,
   type IconComponent,
 } from '../../../icons';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { request } from '../../../connection';
 import type { PublicDevice } from '../../../protocol';
 import { RenameField } from '../parts/room-components';
@@ -24,47 +21,79 @@ export function SettingsScreen() {
   const room = useRoom();
 
   return (
-    <>
+    <div className="settings">
       {!room.isBaby && (
-        <SettingsCard icon={RoomIcon} title={t('settings.room')}>
-          <RenameField
-            label={t('settings.roomName')}
-            testId="rename-room"
-            value={room.session.roomName}
-            onSave={(name) => request('rename-room', { ...room.session, name })}
-          />
-        </SettingsCard>
+        <SettingsGroup title={t('settings.room')}>
+          <li className="settings-row settings-row-field">
+            <RenameField
+              label={t('settings.roomName')}
+              testId="rename-room"
+              value={room.session.roomName}
+              onSave={(name) => request('rename-room', { ...room.session, name })}
+            />
+          </li>
+        </SettingsGroup>
       )}
       <RoomDevices room={room} />
-      {room.isBaby ? (
-        <SettingsCard icon={BabyIcon} title={t('settings.deviceSetup')}>
-          <BabySetup />
-        </SettingsCard>
-      ) : (
-        <SettingsCard icon={AlertIcon} title={t('settings.notifications')}>
-          <NotificationSetup room={room} />
-        </SettingsCard>
-      )}
-      <SettingsCard icon={LanguageIcon} title={t('language.title')}>
-        <p>{t('language.description')}</p>
-        <LanguageSelect />
-      </SettingsCard>
-      <section className="side-card settings-links">
-        <button
-          type="button"
-          className="settings-link"
-          data-testid="manage-device"
+      {room.isBaby ? <BabySetup /> : <NotificationSetup room={room} />}
+      <SettingsGroup title={t('language.title')}>
+        <li className="settings-row">
+          <span className="settings-row-label">{t('language.label')}</span>
+          <LanguageSelect showLabel={false} />
+        </li>
+      </SettingsGroup>
+      <SettingsGroup title={t('settings.thisDevice')}>
+        <SettingsLinkRow
+          icon={DeviceIcon}
+          label={t('settings.manageDevice')}
+          testId="manage-device"
           onClick={room.openSettings}
-        >
-          <span className="card-icon">
-            <DeviceIcon size={19} />
-          </span>
-          <span>{t('settings.manageDevice')}</span>
-          <DisclosureIcon size={18} />
-        </button>
+        />
         {room.preferences}
-      </section>
-    </>
+      </SettingsGroup>
+    </div>
+  );
+}
+
+function SettingsGroup({
+  title,
+  footer,
+  children,
+}: {
+  title: string;
+  footer?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="settings-group">
+      <h3 className="settings-group-title">{title}</h3>
+      <ul className="settings-list">{children}</ul>
+      {footer && <p className="settings-group-footer">{footer}</p>}
+    </section>
+  );
+}
+
+export function SettingsLinkRow({
+  icon: Icon,
+  label,
+  testId,
+  onClick,
+}: {
+  icon: IconComponent;
+  label: string;
+  testId: string;
+  onClick: () => void;
+}) {
+  return (
+    <li>
+      <button type="button" className="settings-link" data-testid={testId} onClick={onClick}>
+        <span className="card-icon">
+          <Icon size={19} />
+        </span>
+        <span>{label}</span>
+        <DisclosureIcon size={18} />
+      </button>
+    </li>
   );
 }
 
@@ -76,24 +105,24 @@ function RoomDevices({ room }: { room: ReturnType<typeof useRoom> }) {
   if (otherDevices.length === 0 && !room.accessNotice) return null;
 
   return (
-    <SettingsCard icon={ParentIcon} title={t('settings.devicesTitle')}>
-      <ul className="device-rows">
-        {otherDevices.map((device) => (
-          <DeviceRow
-            key={device.id}
-            device={device}
-            room={room}
-            onRemove={() => setPendingRemoval(device)}
-          />
-        ))}
-      </ul>
-      {room.accessNotice ? (
-        <p className="caption" role="status">
-          {room.accessNotice}
-        </p>
-      ) : (
-        <p className="caption">{t('settings.devicesHint')}</p>
-      )}
+    <SettingsGroup
+      title={t('settings.devicesTitle')}
+      footer={
+        room.accessNotice ? (
+          <span role="status">{room.accessNotice}</span>
+        ) : (
+          t('settings.devicesHint')
+        )
+      }
+    >
+      {otherDevices.map((device) => (
+        <DeviceRow
+          key={device.id}
+          device={device}
+          room={room}
+          onRemove={() => setPendingRemoval(device)}
+        />
+      ))}
       {pendingRemoval && (
         <RemoveDeviceConfirmation
           device={pendingRemoval}
@@ -105,7 +134,7 @@ function RoomDevices({ room }: { room: ReturnType<typeof useRoom> }) {
           }}
         />
       )}
-    </SettingsCard>
+    </SettingsGroup>
   );
 }
 
@@ -123,7 +152,7 @@ function DeviceRow({
 
   if (renaming) {
     return (
-      <li className="renaming">
+      <li className="settings-row settings-row-field">
         <RenameField
           label={t('settings.deviceNameFor', { name: device.name })}
           testId="rename-device"
@@ -132,124 +161,128 @@ function DeviceRow({
             await request('rename-device', { ...room.session, name, target: device.id });
             setRenaming(false);
           }}
+          onCancel={() => setRenaming(false)}
         />
-        <button type="button" className="quiet small" onClick={() => setRenaming(false)}>
-          {t('common.cancel')}
-        </button>
       </li>
     );
   }
 
   return (
-    <li data-testid="device-row" data-device-id={device.id} data-device-name={device.name}>
+    <li
+      className="settings-row device-row"
+      data-testid="device-row"
+      data-device-id={device.id}
+      data-device-name={device.name}
+    >
       <span className="card-icon">
         {device.role === 'baby' ? <BabyIcon size={19} /> : <ParentIcon size={19} />}
       </span>
-      <div>
+      <div className="settings-row-text">
         <strong>{device.name}</strong>
         <span>
           {device.role === 'baby' ? t('role.baby') : t('role.parent')} ·{' '}
           {device.online ? t('settings.deviceOnline') : t('settings.deviceOffline')}
         </span>
       </div>
-      <button
-        type="button"
-        className="quiet small"
-        data-testid="device-rename"
-        disabled={!room.connected}
-        onClick={() => setRenaming(true)}
-        aria-label={t('settings.renameLabel', { name: device.name })}
-      >
-        {t('settings.rename')}
-      </button>
-      <button
-        type="button"
-        className="quiet small danger"
-        data-testid="device-remove"
-        disabled={room.busy || !room.connected}
-        onClick={onRemove}
-        aria-label={t('settings.removeLabel', { name: device.name })}
-      >
-        {t('settings.remove')}
-      </button>
+      <div className="device-row-actions">
+        <button
+          type="button"
+          className="quiet small"
+          data-testid="device-rename"
+          disabled={!room.connected}
+          onClick={() => setRenaming(true)}
+          aria-label={t('settings.renameLabel', { name: device.name })}
+        >
+          {t('settings.rename')}
+        </button>
+        <button
+          type="button"
+          className="quiet small danger"
+          data-testid="device-remove"
+          disabled={room.busy || !room.connected}
+          onClick={onRemove}
+          aria-label={t('settings.removeLabel', { name: device.name })}
+        >
+          {t('settings.remove')}
+        </button>
+      </div>
     </li>
-  );
-}
-
-function SettingsCard({
-  icon: Icon,
-  title,
-  children,
-}: {
-  icon: IconComponent;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="side-card settings-card">
-      <header className="card-heading">
-        <span className="card-icon">
-          <Icon size={19} />
-        </span>
-        <h3>{title}</h3>
-      </header>
-      {children}
-    </section>
   );
 }
 
 function BabySetup() {
   const t = useIntl();
   return (
-    <>
-      <p>{t('settings.babyKeepPlugged')}</p>
-      <ul className="check-list">
-        <li>
-          <CheckIcon size={17} weight="bold" /> {t('settings.babyCheckAnalyzed')}
-        </li>
-        <li>
-          <CheckIcon size={17} weight="bold" /> {t('settings.babyCheckNoSave')}
-        </li>
-        <li>
-          <CheckIcon size={17} weight="bold" /> {t('settings.babyCheckListen')}
-        </li>
-      </ul>
-    </>
+    <SettingsGroup title={t('settings.deviceSetup')} footer={t('settings.babyKeepPlugged')}>
+      <li className="settings-row">
+        <ul className="check-list">
+          <li>
+            <CheckIcon size={17} weight="bold" /> {t('settings.babyCheckAnalyzed')}
+          </li>
+          <li>
+            <CheckIcon size={17} weight="bold" /> {t('settings.babyCheckNoSave')}
+          </li>
+          <li>
+            <CheckIcon size={17} weight="bold" /> {t('settings.babyCheckListen')}
+          </li>
+        </ul>
+      </li>
+    </SettingsGroup>
   );
 }
 
 function NotificationSetup({ room }: { room: ReturnType<typeof useRoom> }) {
   const t = useIntl();
   return (
-    <>
-      <p>{t('settings.notificationsBody')}</p>
-      <button
-        type="button"
-        className={room.pushEnabled ? 'secondary full small' : 'primary full small'}
-        data-testid="enable-notifications"
-        disabled={room.busy || room.pushEnabled || !room.connected}
-        onClick={() => void room.enableNotifications()}
-      >
-        {room.pushEnabled ? <CheckIcon size={17} weight="bold" /> : <AlertIcon size={17} />}{' '}
-        {room.pushEnabled ? t('settings.notificationsEnabled') : t('settings.notificationsEnable')}
-      </button>
+    <SettingsGroup
+      title={t('settings.notifications')}
+      footer={
+        room.pushTestMessage ? (
+          <span role="status">{room.pushTestMessage}</span>
+        ) : (
+          t('settings.notificationsHint')
+        )
+      }
+    >
+      {room.pushEnabled ? (
+        <li className="settings-row">
+          <span className="card-icon">
+            <AlertIcon size={19} />
+          </span>
+          <div className="settings-row-text">
+            <strong>{t('settings.notificationsEnabled')}</strong>
+            <span>{t('settings.notificationsBody')}</span>
+          </div>
+          <CheckIcon size={20} weight="bold" className="settings-row-check" />
+        </li>
+      ) : (
+        <li className="settings-row settings-row-stack">
+          <p>{t('settings.notificationsBody')}</p>
+          <button
+            type="button"
+            className="primary full small"
+            data-testid="enable-notifications"
+            disabled={room.busy || !room.connected}
+            onClick={() => void room.enableNotifications()}
+          >
+            <AlertIcon size={17} /> {t('settings.notificationsEnable')}
+          </button>
+        </li>
+      )}
       {room.pushEnabled && (
-        <button
-          type="button"
-          className="quiet full small"
-          data-testid="test-notification"
-          disabled={room.busy}
-          onClick={() => void room.testNotification()}
-        >
-          {t('settings.notificationsTest')} <ForwardIcon size={16} />
-        </button>
+        <li>
+          <button
+            type="button"
+            className="settings-link"
+            data-testid="test-notification"
+            disabled={room.busy}
+            onClick={() => void room.testNotification()}
+          >
+            <span>{t('settings.notificationsTest')}</span>
+            <DisclosureIcon size={18} />
+          </button>
+        </li>
       )}
-      {room.pushTestMessage && (
-        <p className="caption" role="status">
-          {room.pushTestMessage}
-        </p>
-      )}
-      <p className="caption">{t('settings.notificationsHint')}</p>
-    </>
+    </SettingsGroup>
   );
 }

@@ -33,11 +33,13 @@ export function RenameField({
   testId,
   value,
   onSave,
+  onCancel,
 }: {
   label: string;
   testId: string;
   value: string;
   onSave: (name: string) => Promise<unknown>;
+  onCancel?: () => void;
 }) {
   const t = useIntl();
   const [name, setName] = useState(value);
@@ -71,14 +73,21 @@ export function RenameField({
           onChange={(event) => setName(event.target.value)}
         />
       </label>
-      <button
-        type="submit"
-        className="secondary small"
-        data-testid={`${testId}-save`}
-        disabled={busy || !name.trim() || name.trim() === value}
-      >
-        {t('common.save')}
-      </button>
+      <div className="rename-actions">
+        {onCancel && (
+          <button type="button" className="quiet small" onClick={onCancel}>
+            {t('common.cancel')}
+          </button>
+        )}
+        <button
+          type="submit"
+          className="secondary small"
+          data-testid={`${testId}-save`}
+          disabled={busy || !name.trim() || name.trim() === value}
+        >
+          {t('common.save')}
+        </button>
+      </div>
       {error && (
         <p role="alert" className="notice">
           {error}

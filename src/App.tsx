@@ -3,12 +3,12 @@ import { Link, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
 import { Toaster, toast } from 'sonner';
 import { usePwa } from './pwa';
 import { Welcome } from './Welcome';
-import { Room } from './features/room';
+import { Room, SettingsLinkRow } from './features/room';
 import { ApiError, request } from './connection';
 import type { Session } from './protocol';
 import { readSession, readRooms, sessionsEqual, storeActive, storeRooms } from './sessions';
 import { InvitationModal, PrivacyModal, RoomsPopover } from './AppModals';
-import { DisclosureIcon, PrivacyIcon } from './icons';
+import { PrivacyIcon } from './icons';
 import { useIntl } from './intl/setup';
 import { LanguageSelect } from './LanguageSelect';
 
@@ -290,18 +290,12 @@ export function AppScreen() {
         roomSwitcher={roomSwitcher}
         updateSession={updateSession}
         preferences={
-          <button
-            type="button"
-            className="settings-link"
-            data-testid="open-privacy"
+          <SettingsLinkRow
+            icon={PrivacyIcon}
+            label={t('common.privacy')}
+            testId="open-privacy"
             onClick={() => setModal('privacy')}
-          >
-            <span className="card-icon">
-              <PrivacyIcon size={19} />
-            </span>
-            <span>{t('common.privacy')}</span>
-            <DisclosureIcon size={18} />
-          </button>
+          />
         }
       />
     );

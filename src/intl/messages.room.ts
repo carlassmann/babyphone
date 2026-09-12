@@ -125,6 +125,7 @@ const baseRoomMessages = messages({
   'settings.deviceSetup': 'Device setup',
   'settings.notifications': 'Notifications',
   'settings.manageDevice': 'Manage this device',
+  'settings.thisDevice': 'This device',
   'settings.devicesTitle': 'Devices in this room',
   'settings.devicesHint':
     'Removing a device also resets the invitation link. Devices that stay keep their connection.',
@@ -280,6 +281,7 @@ const deRoomMessages = translate(baseRoomMessages, {
   'settings.deviceSetup': 'Geräte-Einrichtung',
   'settings.notifications': 'Benachrichtigungen',
   'settings.manageDevice': 'Dieses Gerät verwalten',
+  'settings.thisDevice': 'Dieses Gerät',
   'settings.devicesTitle': 'Geräte in diesem Raum',
   'settings.devicesHint':
     'Das Entfernen eines Geräts setzt auch den Einladungslink zurück. Geräte, die bleiben, behalten ihre Verbindung.',
