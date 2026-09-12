@@ -47,7 +47,7 @@ function alertPayload(event: Alert) {
   const copy = {
     noise: {
       title: 'A little sound',
-      detail: ' detected sustained noise.',
+      detail: ' detected noise.',
     },
     paused: {
       title: 'Monitoring paused',

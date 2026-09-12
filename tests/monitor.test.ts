@@ -2,25 +2,19 @@ import { expect, test } from 'bun:test';
 import { LevelHold, meterFraction, NoiseDetector } from '../src/noise';
 import { recentEvent } from '../src/features/room/lib/recent-event';
 import type { Alert } from '../src/protocol';
-test('noise requires sustained sound, resets for silence, and repeats only after cooldown', () => {
-  const detector = new NoiseDetector(0.1, 1500, 20000);
-  expect(detector.sample(0.2, 0)).toBe(false);
-  expect(detector.sample(0.2, 1000)).toBe(false);
-  expect(detector.sample(0, 1200)).toBe(false);
-  expect(detector.sample(0.2, 1800)).toBe(false);
-  expect(detector.sample(0.2, 3300)).toBe(true);
+test('noise alerts immediately above the threshold, then waits out the cooldown', () => {
+  const detector = new NoiseDetector(0.1, 20000);
+  expect(detector.sample(0.05, 0)).toBe(false);
+  expect(detector.sample(0.2, 100)).toBe(true);
   expect(detector.sample(0.2, 5000)).toBe(false);
   expect(detector.sample(0.2, 20000)).toBe(false);
-  expect(detector.sample(0.2, 23300)).toBe(true);
+  expect(detector.sample(0.2, 20101)).toBe(true);
 });
 
-test('default sensitivity detects normal speech with short gaps', () => {
+test('default sensitivity detects quiet speech on the first sample', () => {
   const detector = new NoiseDetector();
-  for (let now = 0; now <= 1400; now += 100) {
-    const speechLevel = now === 700 || now === 800 ? 0.0001 : 0.001;
-    expect(detector.sample(speechLevel, now)).toBe(false);
-  }
-  expect(detector.sample(0.001, 1500)).toBe(true);
+  expect(detector.sample(0.0001, 0)).toBe(false);
+  expect(detector.sample(0.001, 100)).toBe(true);
 });
 
 test('brief sounds remain visible long enough to notice', () => {

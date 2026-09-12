@@ -204,7 +204,7 @@ function NotificationSetup({ room }: { room: ReturnType<typeof useRoom> }) {
   return (
     <>
       <p>
-        Get a notification for sustained noise or a disconnected baby device, even when Pip is in
+        Get a notification for noise or a disconnected baby device, even when Pip is in
         the background.
       </p>
       <button

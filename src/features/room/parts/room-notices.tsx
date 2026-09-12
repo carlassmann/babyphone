@@ -68,7 +68,7 @@ export function EventNotice({ event, onDismiss }: { event: Alert; onDismiss: () 
     event.kind === 'offline'
       ? ' lost its connection. Check on your baby.'
       : event.kind === 'noise'
-        ? ' picked up a sustained sound.'
+        ? ' picked up a sound.'
         : ' stopped monitoring.';
 
   return (

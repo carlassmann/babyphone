@@ -55,7 +55,7 @@ function BabyMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
         <h2>{room.active ? 'Monitoring sound' : 'Ready to monitor'}</h2>
         <p>
           {room.active
-            ? 'Listening for sustained sounds in this room.'
+            ? 'Listening for sounds in this room.'
             : 'Place this device near your baby, out of reach.'}
         </p>
       </div>
