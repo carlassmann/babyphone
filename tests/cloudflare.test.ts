@@ -38,6 +38,7 @@ test(
         VAPID_PRIVATE_KEY: vapid.privateKey,
         TURN_KEY_ID: 'test-key',
         TURN_KEY_API_TOKEN: 'server-secret',
+        OFFLINE_ALERT_MS: '12000',
       },
       outboundService: async (request) => {
         const url = new URL(request.url);

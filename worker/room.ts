@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { OFFLINE_MS, type Signal } from '../src/protocol';
+import { OFFLINE_ALERT_MS, OFFLINE_MS, type Signal } from '../src/protocol';
 import {
   type Env,
   type Device,
@@ -521,13 +521,17 @@ export class Room extends DurableObject<Env> {
     for (const socket of sockets)
       this.send(socket, JSON.stringify({ type: 'signal', source: source.id, payload }));
   }
+  private offlineAlertDelay() {
+    const configured = Number(this.env.OFFLINE_ALERT_MS);
+    return Number.isFinite(configured) && configured > 0 ? configured : OFFLINE_ALERT_MS;
+  }
   private async schedule() {
     const due = [
       ...this.all<Device>('device')
         .filter(
           (device) => device.role === 'baby' && device.lastSeen > 0 && !device.offlineNotified,
         )
-        .map((device) => device.lastSeen + OFFLINE_MS + 1),
+        .map((device) => device.lastSeen + this.offlineAlertDelay() + 1),
       ...this.all<Delivery>('delivery').map((delivery) => delivery.nextAt),
       ...this.all<Alert>('event').map((event) => event.at + EVENT_RETENTION_MS),
       ...this.ctx
@@ -555,7 +559,7 @@ export class Room extends DurableObject<Env> {
           device.role === 'baby' &&
           device.lastSeen > 0 &&
           !device.offlineNotified &&
-          now - device.lastSeen > OFFLINE_MS
+          now - device.lastSeen > this.offlineAlertDelay()
         ) {
           device.offlineNotified = true;
           device.monitoring = false;

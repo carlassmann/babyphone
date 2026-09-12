@@ -15,6 +15,7 @@ export interface Env {
   VAPID_SUBJECT?: string;
   TURN_KEY_ID?: string;
   TURN_KEY_API_TOKEN?: string;
+  OFFLINE_ALERT_MS?: string;
 }
 export type Device = {
   id: string;

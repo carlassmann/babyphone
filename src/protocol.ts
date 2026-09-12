@@ -47,3 +47,4 @@ export type Signal = {
 };
 export const HEARTBEAT_MS = 3000;
 export const OFFLINE_MS = 12000;
+export const OFFLINE_ALERT_MS = 60000;
