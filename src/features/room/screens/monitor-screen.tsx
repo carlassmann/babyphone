@@ -109,7 +109,7 @@ function BabyMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
           {t('monitor.parentsOnline', { count: room.parents.length })}
         </span>
       </div>
-      {room.active && <DimControl room={room} />}
+      {(room.active || room.dimmed) && <DimControl room={room} />}
       {room.active && !room.awake && <p className="notice">{t('monitor.keepAwake')}</p>}
       <Sensitivity
         id="sensitivity"
@@ -157,6 +157,7 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
         >
           {t('parent.emptyInvite')} <ForwardIcon size={18} />
         </button>
+        {room.dimmed && <DimControl room={room} />}
       </div>
     );
   }
@@ -267,7 +268,7 @@ function ParentMonitor({ room }: { room: ReturnType<typeof useRoom> }) {
           )}
         </article>
       ))}
-      {listening && <DimControl room={room} />}
+      {(listening || room.dimmed) && <DimControl room={room} />}
     </div>
   );
 }
